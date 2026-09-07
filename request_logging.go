@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"log/slog"
 	"net"
@@ -8,10 +9,30 @@ import (
 	"time"
 )
 
+type requestLoggerKey struct{}
+
+func requestLogger(r *http.Request) *slog.Logger {
+	if logger, ok := r.Context().Value(requestLoggerKey{}).(*slog.Logger); ok {
+		return logger
+	}
+	return slog.Default().With("ip", peerIP(r))
+}
+
+// Forwarded IP headers are ignored until a trusted proxy path is configured.
+func peerIP(r *http.Request) string {
+	ip, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return ip
+}
+
 func requestLogging(logger *slog.Logger, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		started := time.Now()
 		requestID := rand.Text()
+		requestLog := logger.With("request_id", requestID, "ip", peerIP(r))
+		r = r.WithContext(context.WithValue(r.Context(), requestLoggerKey{}, requestLog))
 		w.Header().Set("X-Request-ID", requestID)
 		response := &loggedResponse{ResponseWriter: w}
 		completed := false
@@ -26,13 +47,7 @@ func requestLogging(logger *slog.Logger, next http.Handler) http.Handler {
 			} else if status >= 400 {
 				level = slog.LevelWarn
 			}
-			ip, _, err := net.SplitHostPort(r.RemoteAddr)
-			if err != nil {
-				ip = r.RemoteAddr
-			}
-			logger.Log(r.Context(), level, "http request",
-				"request_id", requestID,
-				"ip", ip,
+			requestLog.Log(r.Context(), level, "http request",
 				"method", r.Method,
 				"path", r.URL.Path,
 				"status", status,

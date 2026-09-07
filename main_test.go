@@ -8,16 +8,14 @@ import (
 )
 
 func TestRoutes(t *testing.T) {
-	handler, err := newHandler()
-	if err != nil {
-		t.Fatal(err)
-	}
+	_, handler := authFixture(t, testToken, false)
 	for _, tt := range []struct {
 		name, method, path string
 		status             int
 	}{
 		{"home", http.MethodGet, "/", http.StatusOK},
 		{"unknown page", http.MethodGet, "/missing", http.StatusNotFound},
+		{"removed auth status", http.MethodGet, "/auth/status", http.StatusNotFound},
 		{"unsupported method", http.MethodPost, "/", http.StatusMethodNotAllowed},
 	} {
 		t.Run(tt.name, func(t *testing.T) {

@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Sign in · Screamtober</title>
+  </head>
+  <body>
+    <main>
+      <h1>Sign in</h1>
+      {{if .InvalidToken}}<p role="alert">Invalid login token. Please try again.</p>{{end}}
+      <form method="post" action="/login">
+        <label for="token">Login token</label>
+        <input id="token" name="token" type="password" autocomplete="current-password" required>
+        <button type="submit">Sign in</button>
+      </form>
+      <p><a href="/">Back to Screamtober</a></p>
+    </main>
+  </body>
+</html>

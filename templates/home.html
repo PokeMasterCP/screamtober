@@ -3,13 +3,21 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{.Title}}</title>
+    <title>{{.Title}}{{if .SignedIn}} · Signed in{{end}}</title>
   </head>
   <body>
     <main>
       <h1>{{.Title}}</h1>
       <p>A home for your October movie watchlist, viewing progress, and ratings.</p>
       <p>The first scene is ready. More coming soon.</p>
+      {{if .SignedIn}}
+      <h2>Signed in</h2>
+      <form method="post" action="/logout">
+        <button type="submit">Sign out</button>
+      </form>
+      {{else}}
+      <p><a href="/login">Sign in</a></p>
+      {{end}}
     </main>
   </body>
 </html>

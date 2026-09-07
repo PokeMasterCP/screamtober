@@ -7,21 +7,36 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 )
 
 //go:embed templates/*.html
 var templateFiles embed.FS
 
-func newHandler() (http.Handler, error) {
+func newHandler(auth *auth) (http.Handler, error) {
 	pages, err := template.ParseFS(templateFiles, "templates/*.html")
 	if err != nil {
 		return nil, err
 	}
 
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /login", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		data := struct{ InvalidToken bool }{InvalidToken: r.URL.Query().Get("error") == "invalid"}
+		if err := pages.ExecuteTemplate(w, "login.html", data); err != nil {
+			slog.ErrorContext(r.Context(), "render login", "error", err)
+		}
+	})
+	mux.HandleFunc("POST /login", auth.login)
+	mux.HandleFunc("POST /logout", auth.logout)
 	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
-		data := struct{ Title string }{Title: "Screamtober"}
+		w.Header().Set("Cache-Control", "no-store")
+		data := struct {
+			Title    string
+			SignedIn bool
+		}{Title: "Screamtober", SignedIn: auth.signedIn(r)}
 		var body bytes.Buffer
 		if err := pages.ExecuteTemplate(&body, "home.html", data); err != nil {
 			slog.ErrorContext(r.Context(), "render home", "error", err)
@@ -31,7 +46,7 @@ func newHandler() (http.Handler, error) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_, _ = body.WriteTo(w)
 	})
-	return mux, nil
+	return http.NewCrossOriginProtection().Handler(mux), nil
 }
 
 func main() {
@@ -42,7 +57,20 @@ func main() {
 		os.Exit(1)
 	}
 	slog.SetDefault(logger)
-	handler, err := newHandler()
+	insecureCookie := false
+	if value := os.Getenv("AUTH_INSECURE_COOKIE"); value != "" {
+		insecureCookie, err = strconv.ParseBool(value)
+		if err != nil {
+			logger.Error("AUTH_INSECURE_COOKIE must be a boolean")
+			os.Exit(1)
+		}
+	}
+	auth, err := newAuth(os.Getenv("AUTH_TOKEN"), insecureCookie)
+	if err != nil {
+		logger.Error("invalid authentication configuration", "error", err)
+		os.Exit(1)
+	}
+	handler, err := newHandler(auth)
 	if err != nil {
 		logger.Error("load templates", "error", err)
 		os.Exit(1)
