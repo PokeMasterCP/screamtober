@@ -1,0 +1,80 @@
+package main
+
+import (
+	"context"
+	"database/sql"
+	"embed"
+	"fmt"
+	"io/fs"
+	"net/url"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/pressly/goose/v3"
+	_ "modernc.org/sqlite"
+)
+
+//go:embed migrations/*.sql
+var migrationFiles embed.FS
+
+func databasePath(path, volume string, railway bool) (string, error) {
+	if railway && volume == "" {
+		return "", fmt.Errorf("Railway requires a persistent volume (RAILWAY_VOLUME_MOUNT_PATH)")
+	}
+	if path == "" {
+		if volume != "" {
+			path = filepath.Join(volume, "screamtober.db")
+		} else {
+			path = "data/screamtober.db"
+		}
+	}
+	path, err := filepath.Abs(path)
+	if err != nil {
+		return "", fmt.Errorf("resolve database path: %w", err)
+	}
+	if volume != "" {
+		root, err := filepath.Abs(volume)
+		if err != nil {
+			return "", fmt.Errorf("resolve volume path: %w", err)
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil || rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			return "", fmt.Errorf("DATABASE_PATH must be a file inside RAILWAY_VOLUME_MOUNT_PATH")
+		}
+	}
+	return path, nil
+}
+
+func openDatabase(ctx context.Context, path string) (*sql.DB, error) {
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		return nil, fmt.Errorf("create database directory: %w", err)
+	}
+	// URI encoding keeps filenames containing '?' or '#' from becoming options.
+	params := url.Values{"_pragma": {"foreign_keys(1)", "busy_timeout(5000)", "journal_mode(WAL)"}}
+	dsn := (&url.URL{Scheme: "file", Path: path, RawQuery: params.Encode()}).String()
+	db, err := sql.Open("sqlite", dsn)
+	if err != nil {
+		return nil, fmt.Errorf("open database: %w", err)
+	}
+	// Serialize this small application's writes; pragmas apply to replacement connections too.
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
+	if err := db.PingContext(ctx); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("connect database: %w", err)
+	}
+	migrations, err := fs.Sub(migrationFiles, "migrations")
+	if err == nil {
+		var provider *goose.Provider
+		provider, err = goose.NewProvider(goose.DialectSQLite3, db, migrations, goose.WithDisableGlobalRegistry(true))
+		if err == nil {
+			_, err = provider.Up(ctx)
+		}
+	}
+	if err != nil {
+		db.Close()
+		return nil, fmt.Errorf("migrate database: %w", err)
+	}
+	return db, nil
+}

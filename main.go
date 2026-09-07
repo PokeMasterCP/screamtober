@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"embed"
 	"html/template"
 	"log/slog"
@@ -75,6 +76,20 @@ func main() {
 		logger.Error("load templates", "error", err)
 		os.Exit(1)
 	}
+	path, err := databasePath(os.Getenv("DATABASE_PATH"), os.Getenv("RAILWAY_VOLUME_MOUNT_PATH"), os.Getenv("RAILWAY_PROJECT_ID") != "")
+	if err != nil {
+		logger.Error("invalid database configuration", "error", err)
+		os.Exit(1)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	db, err := openDatabase(ctx, path)
+	cancel()
+	if err != nil {
+		logger.Error("initialize database", "error", err)
+		os.Exit(1)
+	}
+	defer db.Close()
+	logger.Info("database initialized", "path", path)
 	addr := os.Getenv("ADDR")
 	if addr == "" {
 		addr = "127.0.0.1:8080"
@@ -91,6 +106,7 @@ func main() {
 	logger.Info("starting server", "addr", addr)
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		logger.Error("server stopped", "error", err)
+		db.Close()
 		os.Exit(1)
 	}
 }
