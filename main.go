@@ -53,7 +53,7 @@ func main() {
 	}
 	server := &http.Server{
 		Addr:              addr,
-		Handler:           handler,
+		Handler:           requestLogging(logger, handler),
 		ErrorLog:          slog.NewLogLogger(logger.Handler(), slog.LevelError),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
