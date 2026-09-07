@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"sync"
 	"time"
@@ -66,13 +67,13 @@ func (a *auth) login(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	r.Body = http.MaxBytesReader(w, r.Body, 4096)
 	if err := r.ParseForm(); err != nil {
-		requestLogger(r).WarnContext(r.Context(), "user login failed", "reason", "invalid_form")
+		setRequestEvent(r, slog.LevelWarn, "login failed", "reason", "invalid_form")
 		http.Error(w, "Invalid login form", http.StatusBadRequest)
 		return
 	}
 	supplied := sha256.Sum256([]byte(r.PostForm.Get("token")))
 	if subtle.ConstantTimeCompare(supplied[:], a.tokenHash[:]) != 1 {
-		requestLogger(r).WarnContext(r.Context(), "user login failed", "reason", "invalid_token")
+		setRequestEvent(r, slog.LevelWarn, "login failed", "reason", "invalid_token")
 		http.Redirect(w, r, "/login?error=invalid", http.StatusSeeOther)
 		return
 	}
@@ -91,14 +92,14 @@ func (a *auth) login(w http.ResponseWriter, r *http.Request) {
 	// Bound memory even when the shared credential is used repeatedly.
 	if len(a.sessions) >= 128 {
 		a.mu.Unlock()
-		requestLogger(r).WarnContext(r.Context(), "user login failed", "reason", "session_limit")
+		setRequestEvent(r, slog.LevelWarn, "login failed", "reason", "session_limit")
 		http.Error(w, "Too many active sessions; try again later", http.StatusServiceUnavailable)
 		return
 	}
 	a.sessions[sha256.Sum256([]byte(value))] = expiry
 	a.mu.Unlock()
 	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: value, Path: "/", HttpOnly: true, Secure: !a.insecureCookie, SameSite: http.SameSiteLaxMode, MaxAge: int(sessionLifetime.Seconds()), Expires: expiry})
-	requestLogger(r).InfoContext(r.Context(), "user logged in", "username", "shared-user")
+	setRequestEvent(r, slog.LevelInfo, "login successful", "username", "shared-user")
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 

@@ -9,13 +9,23 @@ import (
 	"time"
 )
 
-type requestLoggerKey struct{}
+type requestEventKey struct{}
 
-func requestLogger(r *http.Request) *slog.Logger {
-	if logger, ok := r.Context().Value(requestLoggerKey{}).(*slog.Logger); ok {
-		return logger
+type requestEvent struct {
+	message string
+	level   slog.Level
+	attrs   []any
+}
+
+// setRequestEvent enriches the completion log rather than emitting a second log.
+// Call it synchronously from the handler before returning.
+func setRequestEvent(r *http.Request, level slog.Level, message string, attrs ...any) {
+	if event, ok := r.Context().Value(requestEventKey{}).(*requestEvent); ok {
+		event.message, event.level, event.attrs = message, level, attrs
+		return
 	}
-	return slog.Default().With("ip", peerIP(r))
+	// Handlers used without request middleware still report their event.
+	slog.Default().With("ip", peerIP(r)).Log(r.Context(), level, message, attrs...)
 }
 
 // Forwarded IP headers are ignored until a trusted proxy path is configured.
@@ -32,7 +42,8 @@ func requestLogging(logger *slog.Logger, next http.Handler) http.Handler {
 		started := time.Now()
 		requestID := rand.Text()
 		requestLog := logger.With("request_id", requestID, "ip", peerIP(r))
-		r = r.WithContext(context.WithValue(r.Context(), requestLoggerKey{}, requestLog))
+		event := &requestEvent{message: "http request", level: slog.LevelInfo}
+		r = r.WithContext(context.WithValue(r.Context(), requestEventKey{}, event))
 		w.Header().Set("X-Request-ID", requestID)
 		response := &loggedResponse{ResponseWriter: w}
 		completed := false
@@ -47,7 +58,10 @@ func requestLogging(logger *slog.Logger, next http.Handler) http.Handler {
 			} else if status >= 400 {
 				level = slog.LevelWarn
 			}
-			requestLog.Log(r.Context(), level, "http request",
+			if event.level > level {
+				level = event.level
+			}
+			requestLog.With(event.attrs...).Log(r.Context(), level, event.message,
 				"method", r.Method,
 				"path", r.URL.Path,
 				"status", status,

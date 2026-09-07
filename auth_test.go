@@ -18,9 +18,10 @@ func TestLoginLogging(t *testing.T) {
 	for _, tt := range []struct {
 		name, token, message, level, reason string
 	}{
-		{"success", testToken, "user logged in", "info", ""},
-		{"invalid token", "invalid-token", "user login failed", "warn", "invalid_token"},
-		{"invalid form", strings.Repeat("x", 4097), "user login failed", "warn", "invalid_form"},
+		{"success", testToken, "login successful", "info", ""},
+		{"invalid token", "invalid-token", "login failed", "warn", "invalid_token"},
+		{"invalid form", strings.Repeat("x", 4097), "login failed", "warn", "invalid_form"},
+		{"session limit", testToken, "login failed", "error", "session_limit"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			var output bytes.Buffer
@@ -28,7 +29,12 @@ func TestLoginLogging(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			_, h := authFixture(t, testToken, false)
+			a, h := authFixture(t, testToken, false)
+			if tt.reason == "session_limit" {
+				for i := 0; i < 128; i++ {
+					a.sessions[[32]byte{byte(i)}] = time.Now().Add(time.Hour)
+				}
+			}
 			r := httptest.NewRequest("POST", "/login", strings.NewReader(url.Values{"token": {tt.token}}.Encode()))
 			r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 			r.Header.Set("X-Request-ID", "untrusted-request-id")
@@ -38,14 +44,11 @@ func TestLoginLogging(t *testing.T) {
 			w := httptest.NewRecorder()
 			requestLogging(logger, h).ServeHTTP(w, r)
 			lines := bytes.Split(bytes.TrimSpace(output.Bytes()), []byte("\n"))
-			if len(lines) != 2 {
-				t.Fatalf("expected auth and access events, got %d", len(lines))
+			if len(lines) != 1 {
+				t.Fatalf("expected one combined login event, got %d", len(lines))
 			}
-			var event, access map[string]any
+			var event map[string]any
 			if err := json.Unmarshal(lines[0], &event); err != nil {
-				t.Fatal(err)
-			}
-			if err := json.Unmarshal(lines[1], &access); err != nil {
 				t.Fatal(err)
 			}
 			if event["message"] != tt.message || event["level"] != tt.level || event["time"] == nil {
@@ -61,12 +64,19 @@ func TestLoginLogging(t *testing.T) {
 				}
 			}
 			id := w.Header().Get("X-Request-ID")
-			if id == "" || id == "untrusted-request-id" || event["request_id"] != id || access["request_id"] != id || access["message"] != "http request" {
+			if id == "" || id == "untrusted-request-id" || event["request_id"] != id {
 				t.Fatal("request correlation failed")
 			}
-			if event["ip"] != "2001:db8::1" || access["ip"] != event["ip"] {
+			if event["ip"] != "2001:db8::1" {
 				t.Fatal("IP must match the direct peer, ignoring forwarded headers")
 			}
+			if event["method"] != "POST" || event["path"] != "/login" || event["status"] != float64(w.Code) || event["response_bytes"] != float64(w.Body.Len()) || event["aborted"] != false {
+				t.Fatalf("missing request or response details: %v", event)
+			}
+			if duration, ok := event["duration_ms"].(float64); !ok || duration < 0 {
+				t.Fatal("missing duration")
+			}
+
 			secrets := []string{testToken, tt.token, "untrusted-request-id"}
 			for _, cookie := range w.Result().Cookies() {
 				secrets = append(secrets, cookie.Value)
