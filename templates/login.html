@@ -4,10 +4,12 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Sign in · Screamtober</title>
+    {{template "admin_style"}}
   </head>
   <body>
     <main>
       <h1>Sign in</h1>
+      <p>Enter your login token. A personal token signs you in to the movie challenge; an administrator token opens household management.</p>
       {{if .InvalidToken}}<p role="alert">Invalid login token. Please try again.</p>{{end}}
       <form method="post" action="/login">
         <label for="token">Login token</label>

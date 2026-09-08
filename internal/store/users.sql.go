@@ -12,7 +12,7 @@ import (
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (display_name, role)
 VALUES (?, ?)
-RETURNING id, display_name, role, created_at
+RETURNING id, display_name, role, created_at, disabled_at
 `
 
 type CreateUserParams struct {
@@ -20,7 +20,7 @@ type CreateUserParams struct {
 	Role        string
 }
 
-// User records only; authentication and provisioning belong to the application.
+// Administration must be authorized by the application before invoking writes.
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
 	row := q.db.QueryRowContext(ctx, createUser, arg.DisplayName, arg.Role)
 	var i User
@@ -29,12 +29,47 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.DisplayName,
 		&i.Role,
 		&i.CreatedAt,
+		&i.DisabledAt,
+	)
+	return i, err
+}
+
+const disableUser = `-- name: DisableUser :one
+UPDATE users SET disabled_at = CURRENT_TIMESTAMP WHERE id = ? RETURNING id, display_name, role, created_at, disabled_at
+`
+
+func (q *Queries) DisableUser(ctx context.Context, id int64) (User, error) {
+	row := q.db.QueryRowContext(ctx, disableUser, id)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.DisplayName,
+		&i.Role,
+		&i.CreatedAt,
+		&i.DisabledAt,
+	)
+	return i, err
+}
+
+const enableUser = `-- name: EnableUser :one
+UPDATE users SET disabled_at = NULL WHERE id = ? RETURNING id, display_name, role, created_at, disabled_at
+`
+
+func (q *Queries) EnableUser(ctx context.Context, id int64) (User, error) {
+	row := q.db.QueryRowContext(ctx, enableUser, id)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.DisplayName,
+		&i.Role,
+		&i.CreatedAt,
+		&i.DisabledAt,
 	)
 	return i, err
 }
 
 const getUser = `-- name: GetUser :one
-SELECT id, display_name, role, created_at FROM users WHERE id = ?
+SELECT id, display_name, role, created_at, disabled_at FROM users WHERE id = ?
 `
 
 func (q *Queries) GetUser(ctx context.Context, id int64) (User, error) {
@@ -45,12 +80,13 @@ func (q *Queries) GetUser(ctx context.Context, id int64) (User, error) {
 		&i.DisplayName,
 		&i.Role,
 		&i.CreatedAt,
+		&i.DisabledAt,
 	)
 	return i, err
 }
 
 const listUsers = `-- name: ListUsers :many
-SELECT id, display_name, role, created_at FROM users ORDER BY id
+SELECT id, display_name, role, created_at, disabled_at FROM users ORDER BY id
 `
 
 func (q *Queries) ListUsers(ctx context.Context) ([]User, error) {
@@ -67,6 +103,7 @@ func (q *Queries) ListUsers(ctx context.Context) ([]User, error) {
 			&i.DisplayName,
 			&i.Role,
 			&i.CreatedAt,
+			&i.DisabledAt,
 		); err != nil {
 			return nil, err
 		}
@@ -79,4 +116,26 @@ func (q *Queries) ListUsers(ctx context.Context) ([]User, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const renameUser = `-- name: RenameUser :one
+UPDATE users SET display_name = ? WHERE id = ? RETURNING id, display_name, role, created_at, disabled_at
+`
+
+type RenameUserParams struct {
+	DisplayName string
+	ID          int64
+}
+
+func (q *Queries) RenameUser(ctx context.Context, arg RenameUserParams) (User, error) {
+	row := q.db.QueryRowContext(ctx, renameUser, arg.DisplayName, arg.ID)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.DisplayName,
+		&i.Role,
+		&i.CreatedAt,
+		&i.DisabledAt,
+	)
+	return i, err
 }

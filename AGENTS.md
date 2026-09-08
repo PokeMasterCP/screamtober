@@ -21,16 +21,16 @@ The application supports one owner and up to three additional authenticated user
 - Public access applies to intended public challenge data; it does not make credentials, sessions, or account-management data public.
 - Preserve previous years when creating or updating a challenge for another year.
 
-### Product decisions that remain open
+### Established product and access decisions
 
-Do not silently turn these unknowns into requirements. Check existing implementation and tests first; ask for a decision when the current task depends on an unresolved answer.
-
-- Whether 31 movies is a strict limit or a target, and how incomplete watchlists work.
-- Whether viewing progress is shared or tracked per user, and who may update it.
-- Who may edit, remove, or reorder movies and manage yearly challenges.
-- The rating scale, whether ratings can be edited, and how aggregate ratings are calculated.
-- Whether the same movie may appear more than once within a year or across years.
-- How accounts are provisioned and authenticated.
+- Watchlists may be incomplete, contain repeated movies, and have at most 31 entries per year.
+- Viewing progress is shared by the household. Administration, including watched status, requires an admin session.
+- Ratings are whole stars from 1–5, editable by their author, and tied to each challenge entry. Average only submitted ratings.
+- `ADMIN_TOKEN` is a runtime secret for administrator access. It is never a personal rating credential.
+- The owner has a personal profile and token, just like members. The `owner` role is a household label; it does not grant administration through a personal session.
+- The admin provisions one owner and up to three members, issuing random personal tokens for private out-of-band distribution. There is no public registration.
+- Store only personal token hashes. Replacing a token or disabling access revokes existing access while preserving profiles and ratings. Disabled profiles count toward the household limit.
+- `/login` accepts both token types. Admin and personal sessions use separate cookies and are mutually exclusive in the same browser. Admin sign-in revokes the current personal session; admin users must sign out of the panel before returning to personal use. Enforce this boundary on the server, including direct navigation and sign-in attempts.
 
 ## Technology stack
 

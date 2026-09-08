@@ -5,24 +5,86 @@ Screamtober is a web application for an annual October movie challenge: build a
 organized by year.
 
 Designed for personal use by 1–4 people, with public viewing available to everyone.
-The current Go application serves a placeholder page with shared-token sign-in
-for testing, with SQLite storage and Goose migrations initialized at startup.
-Individual accounts and movie tracking are still to come. There is no public registration.
+The current Go application serves public challenge pages from SQLite with
+individual token sign-in and an administrator-only household portal. Movie and
+rating editing forms are still to come. There is no public registration.
+
+## Challenge pages
+
+- `GET /` shows the latest configured challenge (the highest year), or an empty state.
+- `GET /challenges/{year}` shows that year's ordered watchlist, shared watched status,
+  individual ratings, and the average of submitted ratings. Unknown or malformed
+  years return 404.
+
+Year links let visitors browse earlier challenges. Pages read SQLite on each request
+and use cached movie metadata; no live TMDB call is needed. Entries without votes
+show “No ratings yet.” Database failures return a generic 500 response and enrich
+the existing request log with the failed operation.
+
+Challenge pages are currently read-only. Personal sessions now identify each rating
+author; future movie-management routes must require an admin session, and future
+rating routes must derive the author from the personal session.
 
 ## Setup
 
-An `AUTH_TOKEN` of at least 32 bytes is required; the app will not start without it.
-Generate one in your terminal:
+An `ADMIN_TOKEN` of at least 32 bytes is required. Generate a random value once:
 
 ```sh
-export AUTH_TOKEN="$(openssl rand -hex 32)"
+export ADMIN_TOKEN="$(openssl rand -hex 32)"
 ```
 
-Keep this token private, share it only with the people who should sign in, and
-reuse it between runs. Open `/login` and enter the token to sign in; you can display
-it in your terminal with `printf '%s\n' "$AUTH_TOKEN"`. Everyone else can browse
-public pages without signing in. Sessions expire after 12 hours; restarting the
-app signs everyone out.
+Keep it in your password manager and reuse it between runs. In Railway, set it as
+an application runtime secret. **`ADMIN_TOKEN` replaces the old shared `AUTH_TOKEN`**;
+the old environment variable no longer grants access. Never share the administrator
+token with household members.
+
+## Household onboarding
+
+1. Visit `/login` and enter the administrator token to open household management.
+2. Create your owner profile at `/admin/users`. Copy its personal login token.
+3. Create up to three member profiles and copy their individual tokens.
+4. Deliver each token privately outside the app. Each person signs in at `/login`.
+5. Sign out of admin before entering your own personal token on that same page.
+
+Personal tokens are generated from 32 cryptographically random bytes and shown only
+in the response that creates them. SQLite stores only their SHA-256 hashes. Tokens
+are not included in URLs or logs and cannot be retrieved later. If a token is lost,
+use **Replace login token**; the old token and all of that person's sessions stop
+working. **Disable access** removes their token and signs them out, preserving their
+profile and ratings. A replacement token re-enables a disabled profile. Disabled
+profiles still count toward the one-owner/three-member limit.
+
+The owner label identifies your household profile; it does **not** grant admin
+permissions through your personal token. `/login` accepts either token type and
+chooses the appropriate session. Invalid tokens receive the same generic error.
+Admin and personal sessions use separate cookies but are mutually exclusive in the
+same browser. Signing in as admin revokes the browser's previous personal session.
+While admin is active, product pages redirect to the panel and product writes or
+another sign-in are rejected. Use **Sign out of admin** to return to `/login`, then
+enter a personal token. Expiring or ending admin does not restore the old personal
+session. Admin sessions last one hour; personal sessions last
+12 hours. Both are stored in memory, so restarting the app signs everyone out.
+Personal login tokens persist in SQLite until replaced or disabled. Rotate the
+runtime admin token and restart the app to revoke administrator access.
+
+The backend checks the current personal credential in SQLite on each authenticated
+request, so revocation does not depend only on clearing the in-memory session map.
+All portal mutations require an admin session and POST, with the app's cross-origin
+request protection. Management pages and token responses use `Cache-Control:
+no-store`. To retain portability with the single-instance setup, no external identity
+provider or session service is needed.
+
+| Route | Action |
+| --- | --- |
+| `GET /admin/login` | Compatibility redirect to `/login`; no separate login form |
+| `POST /admin/logout` | Clear the browser's sessions and return to `/login` |
+| `GET /admin/users` | Household access management |
+| `POST /admin/users` | Create a profile and its personal token atomically |
+| `POST /admin/users/{id}/rename` | Update the display name |
+| `POST /admin/users/{id}/token` | Replace the token and re-enable access atomically |
+| `POST /admin/users/{id}/disable` | Disable access and remove its credential atomically |
+| `GET/POST /login` | Unified sign-in; admin token opens the panel, personal token opens the product |
+| `POST /logout` | End only the personal session |
 
 ## Run locally
 
@@ -38,20 +100,20 @@ templates. Set `ADDR` to use a different listening address.
 
 ## Run with Docker
 
-After exporting `AUTH_TOKEN`, build and start the container from the repository root:
+After exporting `ADMIN_TOKEN`, build and start the container from the repository root:
 
 ```sh
 docker build -t screamtober .
 docker run --rm --name screamtober -p 127.0.0.1:8080:8080 \
   -v screamtober-data:/data \
-  -e AUTH_TOKEN -e AUTH_INSECURE_COOKIE=true screamtober
+  -e ADMIN_TOKEN -e AUTH_INSECURE_COOKIE=true screamtober
 ```
 
 Open [localhost:8080](http://127.0.0.1:8080). Rebuild the image after making changes.
 To stop the container, run `docker stop screamtober` in another terminal.
 
 `AUTH_INSECURE_COOKIE=true` is only for local HTTP testing. For hosted HTTPS,
-configure `AUTH_TOKEN` as a runtime secret and leave `AUTH_INSECURE_COOKIE` unset.
+configure `ADMIN_TOKEN` as a runtime secret and leave `AUTH_INSECURE_COOKIE` unset.
 
 ## Database and migrations
 
@@ -66,15 +128,17 @@ the HTTP server starts. A database or migration error prevents startup. A
 successful connection and migration check emit an info-level `database initialized`
 log event with the database path on every startup. The initial
 baseline establishes Goose version tracking; the second migration adds the challenge
-schema described below. sqlc generates database operations from SQL in `queries/`.
-Sign-in sessions remain in memory, and the shared token does not yet identify
-individual database users.
+schema described below. Migration 3 adds disabled status and personal credentials,
+preserving existing profiles and ratings. Existing profiles need tokens issued from
+the admin portal before they can sign in. sqlc generates database operations from
+SQL in `queries/`. Sign-in sessions remain in memory.
 
 ### Schema
 
 | Table | Purpose and constraints |
 | --- | --- |
-| `users` | Display name and owner/member role; at most one owner and three members |
+| `users` | Display name, owner/member label, and disabled status; at most one owner and three members |
+| `user_tokens` | One hashed personal login token per provisioned user |
 | `movies` | Shared catalog with a unique TMDB ID and nullable cached metadata |
 | `challenges` | One challenge per year |
 | `challenge_movies` | Ordered slots 1–31, unique within each challenge; shared `watched_at` |
@@ -83,18 +147,19 @@ individual database users.
 Watchlists can have fewer than 31 entries and can repeat a movie in separate slots.
 Each appearance has independent viewing status and ratings, including across years.
 Users may edit their own ratings; the rating upsert also updates `updated_at`.
-Aggregate scores will be calculated from submitted ratings, excluding missing votes.
+Aggregate scores are calculated from submitted ratings, excluding missing votes.
 Foreign keys reject deletion of referenced records to prevent implicit loss of history.
 Reordering must use a transaction that handles the unique slot constraint.
 
-Only the owner may administer challenges, the catalog, ordering, and shared viewing
-status. Members may rate entries; public visitors have read-only access. These are
-requirements for the future Go handlers: the schema does not authorize requests,
-and this migration does not add endpoints or account provisioning. Account setup
-must create the owner; the database allows an empty household for bootstrapping.
+Administration requires the runtime admin credential. Personal tokens identify
+rating authors, including the owner; visitors have read-only access. The schema
+does not authorize HTTP requests. The database allows an empty household for
+bootstrapping, with profiles and credentials created from the admin portal.
 
 Rolling back migration 2 drops all five application tables and their data. Use
 rollback only on disposable databases unless that data loss is explicitly intended.
+Rolling back migration 3 removes personal credentials and disabled status, while
+preserving profiles and ratings.
 
 For authoring and inspecting migrations, install the pinned Goose CLI:
 
@@ -143,7 +208,7 @@ go generate ./...
 the SQL. Do not edit generated Go files. Docker builds use that generated code and
 do not need sqlc installed.
 
-The initial queries cover user records, cached movie upserts, challenges by year,
+The queries cover user records and credential management, cached movie upserts, challenges by year,
 ordered watchlists, shared watched status, and editable ratings. Movie upserts
 replace the cached metadata (including nullable fields) while retaining the movie
 ID. Rating upserts retain the rating ID and refresh its timestamp. Watch-status and
@@ -155,9 +220,10 @@ request context to each operation. For atomic changes, call `db.BeginTx`, use
 `queries.WithTx(tx)` for every operation, and commit or roll back the transaction.
 Queries do not begin transactions automatically.
 
-This is an internal data-access layer, not authorization. Future Go handlers must
-check owner permissions before administration or watched-status writes and derive
-the rating user ID from the authenticated session. No new HTTP endpoints are exposed.
+This is an internal data-access layer, not authorization. Go handlers must require
+an admin session before administration or watched-status writes and derive the
+rating user ID from the authenticated personal session. Never grant admin access
+based only on the household role stored in `users`.
 Removal and reordering queries will follow with their transactional feature logic.
 
 ## Development checks

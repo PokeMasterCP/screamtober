@@ -1,8 +1,8 @@
 package main
 
 import (
-	"bytes"
 	"context"
+	"database/sql"
 	"embed"
 	"html/template"
 	"log/slog"
@@ -10,18 +10,31 @@ import (
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/pokemastercp/screamtober/internal/store"
 )
 
 //go:embed templates/*.html
 var templateFiles embed.FS
 
-func newHandler(auth *auth) (http.Handler, error) {
+func newHandler(auth *auth, db *sql.DB) (http.Handler, error) {
 	pages, err := template.ParseFS(templateFiles, "templates/*.html")
 	if err != nil {
 		return nil, err
 	}
 
 	mux := http.NewServeMux()
+	admin := &adminHandler{db: db, queries: store.New(db), auth: auth, pages: pages}
+	mux.HandleFunc("GET /admin/login", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+	})
+	mux.HandleFunc("POST /admin/logout", auth.adminLogout)
+	mux.Handle("GET /admin/users", auth.requireAdmin(http.HandlerFunc(admin.users)))
+	mux.Handle("POST /admin/users", auth.requireAdmin(http.HandlerFunc(admin.createUser)))
+	mux.Handle("POST /admin/users/{id}/rename", auth.requireAdmin(http.HandlerFunc(admin.renameUser)))
+	mux.Handle("POST /admin/users/{id}/token", auth.requireAdmin(http.HandlerFunc(admin.replaceToken)))
+	mux.Handle("POST /admin/users/{id}/disable", auth.requireAdmin(http.HandlerFunc(admin.disableUser)))
 	mux.HandleFunc("GET /login", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -32,22 +45,10 @@ func newHandler(auth *auth) (http.Handler, error) {
 	})
 	mux.HandleFunc("POST /login", auth.login)
 	mux.HandleFunc("POST /logout", auth.logout)
-	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "no-store")
-		data := struct {
-			Title    string
-			SignedIn bool
-		}{Title: "Screamtober", SignedIn: auth.signedIn(r)}
-		var body bytes.Buffer
-		if err := pages.ExecuteTemplate(&body, "home.html", data); err != nil {
-			slog.ErrorContext(r.Context(), "render home", "error", err)
-			http.Error(w, "Unable to load page", http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_, _ = body.WriteTo(w)
-	})
-	return http.NewCrossOriginProtection().Handler(mux), nil
+	challenges := &challengeHandler{queries: store.New(db), auth: auth, pages: pages}
+	mux.HandleFunc("GET /{$}", challenges.home)
+	mux.HandleFunc("GET /challenges/{year}", challenges.byYear)
+	return http.NewCrossOriginProtection().Handler(auth.restrictAdminSession(mux)), nil
 }
 
 func main() {
@@ -66,16 +67,6 @@ func main() {
 			os.Exit(1)
 		}
 	}
-	auth, err := newAuth(os.Getenv("AUTH_TOKEN"), insecureCookie)
-	if err != nil {
-		logger.Error("invalid authentication configuration", "error", err)
-		os.Exit(1)
-	}
-	handler, err := newHandler(auth)
-	if err != nil {
-		logger.Error("load templates", "error", err)
-		os.Exit(1)
-	}
 	path, err := databasePath(os.Getenv("DATABASE_PATH"), os.Getenv("RAILWAY_VOLUME_MOUNT_PATH"), os.Getenv("RAILWAY_PROJECT_ID") != "")
 	if err != nil {
 		logger.Error("invalid database configuration", "error", err)
@@ -90,6 +81,18 @@ func main() {
 	}
 	defer db.Close()
 	logger.Info("database initialized", "path", path)
+	auth, err := newAuth(os.Getenv("ADMIN_TOKEN"), insecureCookie, db)
+	if err != nil {
+		logger.Error("invalid authentication configuration", "error", err)
+		db.Close()
+		os.Exit(1)
+	}
+	handler, err := newHandler(auth, db)
+	if err != nil {
+		logger.Error("load templates", "error", err)
+		db.Close()
+		os.Exit(1)
+	}
 	addr := os.Getenv("ADDR")
 	if addr == "" {
 		addr = "127.0.0.1:8080"

@@ -1,0 +1,37 @@
+{{define "admin_style"}}
+<style>
+  :root { color-scheme: light; --ink: #241f1b; --paper: #faf7f0; --accent: #963b18; --line: #d7cfc3; }
+  * { box-sizing: border-box; }
+  body { margin: 0; color: var(--ink); background: var(--paper); font: 1.05rem/1.55 Georgia, serif; }
+  main { max-width: 56rem; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+  header { border-top: .35rem solid var(--accent); border-bottom: 1px solid var(--line); padding: 1rem 0; margin-bottom: 2rem; }
+  .eyebrow { font: .8rem/1.5 monospace; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+  h1 { font-size: clamp(2rem, 6vw, 3rem); line-height: 1.1; margin: .6rem 0; }
+  h2 { font-size: 1.45rem; margin-top: 0; }
+  a { color: var(--accent); text-underline-offset: .2em; }
+  nav, .actions { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem 1.5rem; }
+  section, .profile { padding: 1.5rem 0; border-bottom: 1px solid var(--line); }
+  .profiles { padding: 0; list-style: none; }
+  .profile:first-child { border-top: 1px solid var(--line); }
+  label { display: block; font-weight: bold; margin-top: .8rem; }
+  input, select, button { font: inherit; max-width: 100%; }
+  input, select { display: block; width: 100%; padding: .6rem; margin: .3rem 0 .8rem; background: white; color: var(--ink); border: 1px solid #817469; border-radius: 2px; }
+  button { background: var(--accent); color: white; border: 1px solid var(--accent); border-radius: 2px; padding: .55rem .85rem; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--accent); }
+  button:disabled { opacity: .55; cursor: default; }
+  :focus-visible { outline: 3px solid #216077; outline-offset: 3px; }
+  .error { border-left: .3rem solid #b51f16; padding: .75rem 1rem; background: #fff0e9; }
+  .muted { color: #63574d; }
+  .token { font-family: monospace; font-size: 1rem; }
+  .token-panel { border: 2px solid var(--accent); padding: 1.25rem; margin: 2rem 0; }
+  form { margin: 0; }
+  .rename { max-width: 30rem; margin-bottom: 1rem; }
+  @media (max-width: 36rem) { .actions { align-items: stretch; flex-direction: column; } .actions button { width: 100%; } }
+</style>
+{{end}}
+{{define "admin_nav"}}
+<nav aria-label="Administration">
+  <a href="/admin/users">Household</a>
+  <form method="post" action="/admin/logout"><button class="secondary" type="submit">Sign out of admin</button></form>
+</nav>
+{{end}}

@@ -3,15 +3,56 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{.Title}}{{if .SignedIn}} · Signed in{{end}}</title>
+    <title>{{if .Challenge}}{{.Challenge.Year}} · {{end}}{{.Title}}{{if .SignedIn}} · Signed in{{end}}</title>
   </head>
   <body>
     <main>
       <h1>{{.Title}}</h1>
       <p>A home for your October movie watchlist, viewing progress, and ratings.</p>
-      <p>The first scene is ready. More coming soon.</p>
+      {{if .Challenges}}
+      <nav aria-label="Challenge years">
+        <ul>
+          {{range .Challenges}}
+          <li><a href="/challenges/{{.Year}}"{{if eq .ID $.Challenge.ID}} aria-current="page"{{end}}>{{.Year}}</a></li>
+          {{end}}
+        </ul>
+      </nav>
+      {{end}}
+      {{if .Challenge}}
+      <section aria-labelledby="challenge-heading">
+        <h2 id="challenge-heading">{{.Challenge.Year}} movie challenge</h2>
+        <p>{{len .Movies}} of 31 movies selected · {{.Watched}} watched</p>
+        {{if .Movies}}
+        <ol>
+          {{range .Movies}}
+          <li value="{{.Position}}">
+            <article>
+              <h3>{{.Title}}</h3>
+              {{if .ReleaseDate.Valid}}<p>Released {{.ReleaseDate.String}}</p>{{end}}
+              {{if .Overview.Valid}}<p>{{.Overview.String}}</p>{{end}}
+              <p>{{if .WatchedAt.Valid}}Watched{{else}}Not watched yet{{end}}</p>
+              {{if .Ratings}}
+              <p>Household rating: {{.Average}} / 5 ({{len .Ratings}} {{if eq (len .Ratings) 1}}rating{{else}}ratings{{end}})</p>
+              <ul aria-label="Individual ratings">
+                {{range .Ratings}}<li>{{.DisplayName}}: {{.Score}} / 5</li>{{end}}
+              </ul>
+              {{else}}
+              <p>No ratings yet.</p>
+              {{end}}
+            </article>
+          </li>
+          {{end}}
+        </ol>
+        {{else}}
+        <p>No movies selected for this year yet.</p>
+        {{end}}
+      </section>
+      {{else}}
+      <p>No challenges yet. Check back when the household watchlist is ready.</p>
+      {{end}}
       {{if .SignedIn}}
       <h2>Signed in</h2>
+      <p>{{.User.DisplayName}}</p>
       <form method="post" action="/logout">
         <button type="submit">Sign out</button>
       </form>

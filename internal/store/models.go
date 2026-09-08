@@ -44,4 +44,11 @@ type User struct {
 	DisplayName string
 	Role        string
 	CreatedAt   string
+	DisabledAt  sql.NullString
+}
+
+type UserToken struct {
+	UserID    int64
+	TokenHash []byte
+	CreatedAt string
 }

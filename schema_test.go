@@ -123,7 +123,7 @@ func TestUpgradeFromBaseline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := provider.Down(ctx); err != nil {
+	if _, err := provider.DownTo(ctx, 1); err != nil {
 		t.Fatal(err)
 	}
 	var count int
@@ -139,5 +139,30 @@ func TestUpgradeFromBaseline(t *testing.T) {
 	}
 	if err := db.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name IN ('users', 'movies', 'challenges', 'challenge_movies', 'ratings')`).Scan(&count); err != nil || count != 5 {
 		t.Fatalf("tables after upgrade = %d, error = %v", count, err)
+	}
+}
+
+func TestUserAccessMigrationPreservesHistory(t *testing.T) {
+	ctx := context.Background()
+	db := schemaFixture(t)
+	migrations, err := fs.Sub(migrationFiles, "migrations")
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider, err := goose.NewProvider(goose.DialectSQLite3, db, migrations, goose.WithDisableGlobalRegistry(true))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := provider.DownTo(ctx, 2); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := provider.Up(ctx); err != nil {
+		t.Fatal(err)
+	}
+	for table, want := range map[string]int{"users": 2, "ratings": 4, "challenge_movies": 3, "user_tokens": 0} {
+		var count int
+		if err := db.QueryRowContext(ctx, "SELECT count(*) FROM "+table).Scan(&count); err != nil || count != want {
+			t.Fatalf("%s count after upgrade = %d, error = %v", table, count, err)
+		}
 	}
 }

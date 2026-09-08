@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Personal token created · Screamtober</title>
+  {{template "admin_style"}}
+</head>
+<body>
+<main>
+  <header><p class="eyebrow">Screamtober / Administration</p><h1>Personal token created</h1>{{template "admin_nav"}}</header>
+  <p>Access is ready for <strong>{{.Name}}</strong>.</p>
+  <div class="token-panel">
+    <label for="new-token">Personal login token</label>
+    <input class="token" id="new-token" type="text" value="{{.Token}}" readonly autocomplete="off" spellcheck="false" aria-describedby="token-help">
+    <p id="token-help">Copy this token now and share it privately with {{.Name}}. It cannot be retrieved after you leave this page.</p>
+  </div>
+  <p>They can enter it on the site's sign-in page. Keep it in a password manager for future sign-ins.</p>
+  <p>To use your own personal token, sign out of admin first.</p>
+  <p>If it is lost, create a replacement from the household page. Previous tokens and sessions will stop working.</p>
+  <p><a href="/admin/users">Back to household</a></p>
+</main>
+</body>
+</html>

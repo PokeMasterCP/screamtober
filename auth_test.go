@@ -2,15 +2,21 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/pokemastercp/screamtober/internal/store"
 )
+
+const testAdminToken = "admin-test-only-0123456789abcdef0123456789abcdef"
 
 const testToken = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
@@ -32,7 +38,7 @@ func TestLoginLogging(t *testing.T) {
 			a, h := authFixture(t, testToken, false)
 			if tt.reason == "session_limit" {
 				for i := 0; i < 128; i++ {
-					a.sessions[[32]byte{byte(i)}] = time.Now().Add(time.Hour)
+					a.sessions[[32]byte{byte(i)}] = userSession{expiresAt: time.Now().Add(time.Hour)}
 				}
 			}
 			r := httptest.NewRequest("POST", "/login", strings.NewReader(url.Values{"token": {tt.token}}.Encode()))
@@ -55,11 +61,11 @@ func TestLoginLogging(t *testing.T) {
 				t.Fatalf("unexpected event: %v", event)
 			}
 			if tt.reason == "" {
-				if event["username"] != "shared-user" {
+				if event["user_id"] != float64(1) {
 					t.Fatal("successful identity missing")
 				}
 			} else {
-				if event["reason"] != tt.reason || event["username"] != nil {
+				if event["reason"] != tt.reason || event["user_id"] != nil {
 					t.Fatal("failed event must have a reason without claiming an authenticated identity")
 				}
 			}
@@ -79,7 +85,9 @@ func TestLoginLogging(t *testing.T) {
 
 			secrets := []string{testToken, tt.token, "untrusted-request-id"}
 			for _, cookie := range w.Result().Cookies() {
-				secrets = append(secrets, cookie.Value)
+				if cookie.Value != "" {
+					secrets = append(secrets, cookie.Value)
+				}
 			}
 			for _, secret := range secrets {
 				if strings.Contains(output.String(), secret) {
@@ -92,11 +100,21 @@ func TestLoginLogging(t *testing.T) {
 
 func authFixture(t *testing.T, token string, insecure bool) (*auth, http.Handler) {
 	t.Helper()
-	a, err := newAuth(token, insecure)
+	db, err := openDatabase(context.Background(), filepath.Join(t.TempDir(), "auth.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	h, err := newHandler(a)
+	t.Cleanup(func() { db.Close() })
+	user, err := store.New(db).CreateUser(context.Background(), store.CreateUserParams{DisplayName: "Test user", Role: "member"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	setTestUserToken(t, db, user.ID, token)
+	a, err := newAuth(testAdminToken, insecure, db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h, err := newHandler(a, db)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,11 +144,7 @@ func loginCookie(t *testing.T, h http.Handler) *http.Cookie {
 	if w.Code != http.StatusSeeOther {
 		t.Fatalf("login status: %d", w.Code)
 	}
-	cookies := w.Result().Cookies()
-	if len(cookies) != 1 {
-		t.Fatalf("login cookies: %v", cookies)
-	}
-	return cookies[0]
+	return activeSessionCookie(t, w, sessionCookie)
 }
 
 func TestAuthLifecycle(t *testing.T) {
@@ -192,7 +206,7 @@ func TestSessionExpiryRestartAndForgery(t *testing.T) {
 	if w := authRequest(h, "GET", "/test/protected", "", forged); w.Code != 401 {
 		t.Fatal("forged cookie accepted")
 	}
-	a.sessions[sha256.Sum256([]byte(cookie.Value))] = time.Now().Add(-time.Second)
+	a.sessions[sha256.Sum256([]byte(cookie.Value))] = userSession{expiresAt: time.Now().Add(-time.Second)}
 	if w := authRequest(h, "GET", "/test/protected", "", cookie); w.Code != 401 {
 		t.Fatal("expired session accepted")
 	}
@@ -227,10 +241,10 @@ func TestAuthCSRF(t *testing.T) {
 }
 
 func TestAuthConfigurationAndInput(t *testing.T) {
-	if a, err := newAuth("", false); err == nil || err.Error() != "AUTH_TOKEN is required" || a != nil {
+	if a, err := newAuth("", false, nil); err == nil || err.Error() != "ADMIN_TOKEN is required" || a != nil {
 		t.Fatal("missing token must prevent authentication setup with a clear error")
 	}
-	if _, err := newAuth("short", false); err == nil {
+	if _, err := newAuth("short", false, nil); err == nil {
 		t.Fatal("short token accepted")
 	}
 	_, h := authFixture(t, testToken, false)
