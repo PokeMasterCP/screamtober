@@ -79,11 +79,18 @@ timeout. It reports missing configuration, invalid IDs, unavailable movies,
 rejected credentials, rate limits, and upstream failures without exposing the
 key or upstream error bodies. Requests are not automatically retried.
 
-These integrations are local developer commands; they do not open SQLite,
-save movies, or expose a web route, and they are not bundled in the Docker image.
-The web app still runs without `TMDB_API_KEY` and serves cached challenge data.
-Movie-entry forms and TMDB attribution in those forms will follow when
-metadata is integrated into the UI.
+Sign in as administrator and choose **Search movies**, or open
+`/admin/movies/search`. Enter a title and submit to display the first page of
+search results as formatted JSON. Empty searches and upstream failures display
+feedback on the same page. This is read-only and does not save movies.
+Personal sessions and visitors cannot access this admin tool.
+
+Set `TMDB_API_KEY` in the web server environment and restart the app. In Docker,
+add `-e TMDB_API_KEY` to either deployment command after exporting the variable.
+The web app still starts without the key and serves cached challenge data;
+search displays a configuration message until the key is supplied. The CLI
+commands remain local developer tools and are not bundled in the Docker image.
+Movie selection and saving will follow later.
 
 ## Logging
 
@@ -92,8 +99,15 @@ has one completion record containing its request ID, client IP, method, path,
 status, duration, and response size. Handlers enrich that record with the outcome
 or error instead of emitting a duplicate event. Startup and lifecycle events have
 their own records. Tokens, cookies, authorization headers, bodies, and query
-strings are excluded. `LOG_LEVEL` accepts `debug`, `info` (default), `warn`, or
+strings are excluded. Validated movie titles are intentionally logged separately
+as `search_term`. `LOG_LEVEL` accepts `debug`, `info` (default), `warn`, or
 `error`; records below that threshold are filtered.
+
+Movie searches use the stable message `movie search`, with `outcome` describing
+`success`, `invalid_query`, `not_configured`, `rate_limited`, or `upstream_failure`.
+Search attempts include the trimmed, validated `search_term` on success and
+upstream failure; invalid input is omitted. They omit a redundant `operation` field. Opening the form without submitting a
+query remains an ordinary `http request` event.
 
 Successful personal and administrator sign-ins return a 200 confirmation page
 with a continuation link, avoiding an automatic redirect GET. Following the link

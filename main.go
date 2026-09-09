@@ -12,12 +12,17 @@ import (
 	"time"
 
 	"github.com/pokemastercp/screamtober/internal/store"
+	"github.com/pokemastercp/screamtober/internal/tmdb"
 )
 
 //go:embed templates/*.html
 var templateFiles embed.FS
 
 func newHandler(auth *auth, db *sql.DB) (http.Handler, error) {
+	return newHandlerWithMovieSearch(auth, db, tmdb.New(os.Getenv("TMDB_API_KEY")))
+}
+
+func newHandlerWithMovieSearch(auth *auth, db *sql.DB, movies movieSearcher) (http.Handler, error) {
 	pages, err := template.ParseFS(templateFiles, "templates/*.html")
 	if err != nil {
 		return nil, err
@@ -25,6 +30,8 @@ func newHandler(auth *auth, db *sql.DB) (http.Handler, error) {
 
 	mux := http.NewServeMux()
 	admin := &adminHandler{db: db, queries: store.New(db), auth: auth, pages: pages}
+	search := &movieSearchHandler{admin: admin, movies: movies}
+	mux.Handle("GET /admin/movies/search", auth.requireAdmin(http.HandlerFunc(search.search)))
 	mux.HandleFunc("GET /admin/login", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
 		http.Redirect(w, r, "/login", http.StatusSeeOther)

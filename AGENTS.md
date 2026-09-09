@@ -112,6 +112,15 @@ Use your judgment and voice concerns when a proposed choice is unsafe, unnecessa
 5. Preserve unrelated work already present in the repository. Do not overwrite or revert it to simplify the task.
 6. Update relevant documentation when changing behavior, configuration, setup, or deployment requirements.
 
+## Documentation audience
+
+- `README.md` is for self-hosters and people using Screamtober. Focus on what the product does, how to deploy and configure it, and how to use it.
+- Update the README when a change affects those tasks; do not turn it into a feature-by-feature implementation reference or development changelog.
+- Include operational details that help self-hosters run the app reliably, such as required environment variables, persistent storage, backups, upgrades, and actionable troubleshooting.
+- Keep implementation details in relevant developer documentation or code comments. Internal package APIs, database query mechanics, test coverage, and exhaustive log fields or outcome values generally do not belong in the README.
+- Describe logging only to the extent useful for operation: where to find logs, how to set verbosity, and any meaningful privacy considerations. Explain internal logging conventions in developer documentation instead.
+- Prefer concise, task-oriented instructions and examples over explanations of how every feature works internally.
+
 ## Validation and completion
 
 - Format changed Go code with `gofmt` and run the repository's relevant checks. If no alternative is documented, use `go test ./...` for Go tests.
