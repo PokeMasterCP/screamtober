@@ -38,6 +38,36 @@ an application runtime secret. **`ADMIN_TOKEN` replaces the old shared `AUTH_TOK
 the old environment variable no longer grants access. Never share the administrator
 token with household members.
 
+## TMDB movie lookup
+
+Set **`TMDB_API_KEY`** to your TMDB **v3 API key**, available in your
+[TMDB API settings](https://www.themoviedb.org/settings/api). This is distinct
+from the API Read Access Token. Supply it through your shell environment or
+runtime secret configuration; do not commit the key to the repository.
+
+With that variable exported, retrieve a movie by its TMDB ID:
+
+```sh
+go run ./cmd/movie-info 11
+```
+
+The command prints JSON with the title, overview, release date, runtime in
+minutes, genres, and poster/backdrop paths. Unknown optional values may be null
+or empty. Image paths are TMDB-relative paths, not complete image URLs.
+It uses TMDB's [movie details endpoint](https://developer.themoviedb.org/reference/movie-details)
+and [API key authentication](https://developer.themoviedb.org/docs/authentication-application).
+
+The reusable `internal/tmdb` client accepts a context and has a ten-second HTTP
+timeout. It reports missing configuration, invalid IDs, unavailable movies,
+rejected credentials, rate limits, and upstream failures without exposing the
+key or upstream error bodies. Requests are not automatically retried.
+
+This first integration is a local developer command; it does not open SQLite,
+save movies, or expose a web route, and it is not bundled in the Docker image.
+The web app still runs without `TMDB_API_KEY` and serves cached challenge data.
+Search, movie-entry forms, and TMDB attribution in those forms will follow when
+metadata is integrated into the UI.
+
 ## Logging
 
 Logs are structured JSON. Prefer **one event per log record**: each HTTP request
