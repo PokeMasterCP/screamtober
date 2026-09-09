@@ -3,9 +3,13 @@ package main
 import (
 	"context"
 	"crypto/rand"
+	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
+	"net/netip"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -25,10 +29,45 @@ func setRequestEvent(r *http.Request, level slog.Level, message string, attrs ..
 		return
 	}
 	// Handlers used without request middleware still report their event.
-	slog.Default().With("ip", peerIP(r)).Log(r.Context(), level, message, attrs...)
+	slog.Default().With("ip", clientIP(r)).Log(r.Context(), level, message, attrs...)
 }
 
-// Forwarded IP headers are ignored until a trusted proxy path is configured.
+type clientIPKey struct{}
+
+func parseCloudflareTunnel(value string) (bool, error) {
+	if value == "" {
+		return false, nil
+	}
+	enabled, err := strconv.ParseBool(value)
+	if err != nil {
+		return false, fmt.Errorf("CLOUDFLARE_TUNNEL must be a boolean")
+	}
+	return enabled, nil
+}
+
+// Tunnel mode trusts the deployment's private ingress boundary.
+func trustedClientIP(tunnel bool, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if tunnel {
+			values := r.Header.Values("CF-Connecting-IP")
+			if len(values) == 1 {
+				ip, err := netip.ParseAddr(strings.TrimSpace(values[0]))
+				if err == nil && ip.Zone() == "" {
+					r = r.WithContext(context.WithValue(r.Context(), clientIPKey{}, ip.Unmap().String()))
+				}
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func clientIP(r *http.Request) string {
+	if ip, ok := r.Context().Value(clientIPKey{}).(string); ok {
+		return ip
+	}
+	return peerIP(r)
+}
+
 func peerIP(r *http.Request) string {
 	ip, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
@@ -41,7 +80,7 @@ func requestLogging(logger *slog.Logger, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		started := time.Now()
 		requestID := rand.Text()
-		requestLog := logger.With("request_id", requestID, "ip", peerIP(r))
+		requestLog := logger.With("request_id", requestID, "ip", clientIP(r))
 		event := &requestEvent{message: "http request", level: slog.LevelInfo}
 		r = r.WithContext(context.WithValue(r.Context(), requestEventKey{}, event))
 		w.Header().Set("X-Request-ID", requestID)

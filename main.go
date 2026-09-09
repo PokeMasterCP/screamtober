@@ -40,7 +40,7 @@ func newHandler(auth *auth, db *sql.DB) (http.Handler, error) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		data := struct{ InvalidToken bool }{InvalidToken: r.URL.Query().Get("error") == "invalid"}
 		if err := pages.ExecuteTemplate(w, "login.html", data); err != nil {
-			slog.ErrorContext(r.Context(), "render login", "error", err)
+			setRequestEvent(r, slog.LevelError, "render login failed", "error", err)
 		}
 	})
 	mux.HandleFunc("POST /login", auth.login)
@@ -59,6 +59,11 @@ func main() {
 		os.Exit(1)
 	}
 	slog.SetDefault(logger)
+	tunnel, err := parseCloudflareTunnel(os.Getenv("CLOUDFLARE_TUNNEL"))
+	if err != nil {
+		logger.Error("invalid deployment configuration", "error", err)
+		os.Exit(1)
+	}
 	insecureCookie := false
 	if value := os.Getenv("AUTH_INSECURE_COOKIE"); value != "" {
 		insecureCookie, err = strconv.ParseBool(value)
@@ -67,7 +72,7 @@ func main() {
 			os.Exit(1)
 		}
 	}
-	path, err := databasePath(os.Getenv("DATABASE_PATH"), os.Getenv("RAILWAY_VOLUME_MOUNT_PATH"), os.Getenv("RAILWAY_PROJECT_ID") != "")
+	path, err := databasePath(os.Getenv("DATABASE_DIR"))
 	if err != nil {
 		logger.Error("invalid database configuration", "error", err)
 		os.Exit(1)
@@ -99,7 +104,7 @@ func main() {
 	}
 	server := &http.Server{
 		Addr:              addr,
-		Handler:           requestLogging(logger, handler),
+		Handler:           trustedClientIP(tunnel, requestLogging(logger, handler)),
 		ErrorLog:          slog.NewLogLogger(logger.Handler(), slog.LevelError),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,

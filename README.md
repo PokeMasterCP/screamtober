@@ -33,10 +33,26 @@ An `ADMIN_TOKEN` of at least 32 bytes is required. Generate a random value once:
 export ADMIN_TOKEN="$(openssl rand -hex 32)"
 ```
 
-Keep it in your password manager and reuse it between runs. In Railway, set it as
+Keep it in your password manager and reuse it between runs. For deployment, set it as
 an application runtime secret. **`ADMIN_TOKEN` replaces the old shared `AUTH_TOKEN`**;
 the old environment variable no longer grants access. Never share the administrator
 token with household members.
+
+## Logging
+
+Logs are structured JSON. Prefer **one event per log record**: each HTTP request
+has one completion record containing its request ID, client IP, method, path,
+status, duration, and response size. Handlers enrich that record with the outcome
+or error instead of emitting a duplicate event. Startup and lifecycle events have
+their own records. Tokens, cookies, authorization headers, bodies, and query
+strings are excluded. `LOG_LEVEL` accepts `debug`, `info` (default), `warn`, or
+`error`; records below that threshold are filtered.
+
+Successful personal and administrator sign-ins return a 200 confirmation page
+with a continuation link, avoiding an automatic redirect GET. Following the link
+is a separate navigation request and is logged normally. Refreshing the
+confirmation page may prompt the browser to resubmit the form. Existing failed
+sign-in and other redirects retain their behavior.
 
 ## Household onboarding
 
@@ -98,27 +114,102 @@ AUTH_INSECURE_COOKIE=true go run .
 Open [localhost:8080](http://127.0.0.1:8080). Restart the app after changing code or
 templates. Set `ADDR` to use a different listening address.
 
-## Run with Docker
+## Deploy with Docker
 
-After exporting `ADMIN_TOKEN`, build and start the container from the repository root:
+Use the same image on any Docker-compatible host, with or without Cloudflare
+Tunnel. Export `ADMIN_TOKEN` as described above, then build:
 
 ```sh
 docker build -t screamtober .
-docker run --rm --name screamtober -p 127.0.0.1:8080:8080 \
-  -v screamtober-data:/data \
-  -e ADMIN_TOKEN -e AUTH_INSECURE_COOKIE=true screamtober
 ```
 
-Open [localhost:8080](http://127.0.0.1:8080). Rebuild the image after making changes.
-To stop the container, run `docker stop screamtober` in another terminal.
+### Without Cloudflare Tunnel (default)
 
-`AUTH_INSECURE_COOKIE=true` is only for local HTTP testing. For hosted HTTPS,
-configure `ADMIN_TOKEN` as a runtime secret and leave `AUTH_INSECURE_COOKIE` unset.
+```sh
+docker run -d --name screamtober --restart unless-stopped \
+  -p 127.0.0.1:8080:8080 -v screamtober-data:/data \
+  -e ADMIN_TOKEN -e CLOUDFLARE_TUNNEL=false screamtober
+```
+
+For hosted use, configure your HTTPS reverse proxy or platform ingress to forward
+to the app's HTTP port 8080. This example binds the published port to host
+loopback for a host-based proxy; adapt networking to your environment. The Go
+server does not terminate TLS. The operator manages HTTPS and edge protections.
+
+For local HTTP testing, add `-e AUTH_INSECURE_COOKIE=true` and open
+[localhost:8080](http://127.0.0.1:8080). Leave that setting unset for hosted HTTPS.
+
+### With Cloudflare Tunnel
+
+Create a remotely managed tunnel and configure its public hostname to forward to
+`http://screamtober:8080`. Supply its token as the runtime environment variable
+`TUNNEL_TOKEN` for the connector, then run:
+
+```sh
+docker network create screamtober-net
+docker run -d --name screamtober --restart unless-stopped \
+  --network screamtober-net -v screamtober-data:/data \
+  -e ADMIN_TOKEN -e CLOUDFLARE_TUNNEL=true screamtober
+docker run -d --name cloudflared --restart unless-stopped \
+  --network screamtober-net -e TUNNEL_TOKEN \
+  cloudflare/cloudflared:latest tunnel --no-autoupdate run
+```
+
+The app has no published port in this mode. Keep it private and allow public
+traffic only through the tunnel; services with internal access must be trusted.
+The connector needs outbound network access. Select and pin a connector version
+or digest for a repeatable deployment.
+See [Cloudflare Tunnel setup](https://developers.cloudflare.com/tunnel/setup/)
+and [connector run parameters](https://developers.cloudflare.com/tunnel/advanced/run-parameters/).
+Configure desired edge protections explicitly; a tunnel alone does not enable
+every WAF, rate-limiting, or bot-protection feature.
+
+These are alternative examples: stop and remove an existing app container before
+switching modes, retaining its named data volume. Rebuild the image to deploy
+code changes. Run only one app instance against the database.
+
+### Deployment configuration and client IPs
+
+| Variable | Behavior |
+| --- | --- |
+| `CLOUDFLARE_TUNNEL` | Unset/false: socket peer IP. True: trust a valid `CF-Connecting-IP` supplied through the private tunnel path. Invalid boolean values prevent startup. |
+| `ADDR` | Docker defaults to `:8080`; local Go runs default to `127.0.0.1:8080`. |
+| `DATABASE_DIR` | Directory containing `screamtober.db`: Docker defaults to `/data`, local Go runs to `data`. |
+| `ADMIN_TOKEN` | Required administrator secret, at least 32 bytes. |
+| `LOG_LEVEL` | `debug`, `info` (default), `warn`, or `error`. |
+| `AUTH_INSECURE_COOKIE` | Default false; true permits cookies over HTTP for local development only. |
+
+All settings above can be supplied at container startup with `docker run -e` or
+your deployment platform’s environment configuration. Dockerfile `ENV` entries
+are defaults, not fixed values. For example, to change the listening port:
+
+```sh
+docker run -d --name screamtober --restart unless-stopped \
+  -p 127.0.0.1:9090:9090 -v screamtober-data:/data \
+  -e ADMIN_TOKEN -e ADDR=:9090 screamtober
+```
+
+Update the container port mapping or tunnel origin URL to match `ADDR`.
+`EXPOSE 8080` is image metadata; it does not restrict the listening port.
+`TUNNEL_TOKEN` is configured separately on the connector container.
+
+`CLOUDFLARE_TUNNEL` declares the deployment's trust boundary; it does not create
+a tunnel, change networking, or configure TLS. No proxy CIDR list is required.
+With tunnel mode enabled, missing, malformed, or duplicate `CF-Connecting-IP`
+headers fall back to the socket peer IP. Only a single valid IPv4 or IPv6 value
+is accepted. Without tunnel mode, the header is ignored even when present.
+
+`X-Forwarded-For` and forwarded scheme headers are not trusted in either mode.
+With a normal reverse proxy, logs therefore show the proxy's socket IP. Cloudflare
+Pseudo IPv4 should be Off or Add Header to preserve original IPv6 addresses;
+Overwrite Headers replaces `CF-Connecting-IP`. See
+[Cloudflare's header documentation](https://developers.cloudflare.com/fundamentals/reference/http-headers/#cf-connecting-ip).
 
 ## Database and migrations
 
-Local runs create `data/screamtober.db`; set `DATABASE_PATH` to override the file
-location. The parent directory is created if needed. Database files are ignored by
+Local runs create `data/screamtober.db`; set `DATABASE_DIR` to change its directory.
+The app opens that directory’s `screamtober.db` directly, creating it when missing;
+it does not search for database files. The directory is created if needed. Database files are ignored by
 Git and excluded from Docker builds. SQLite uses WAL mode, foreign-key enforcement,
 a five-second busy timeout, and a single pooled connection. The pure Go driver
 keeps the Docker build independent of CGO.
@@ -175,23 +266,24 @@ the local app (or rebuild the Docker image) to apply new migrations. Test rollba
 only against disposable databases. Goose [migration documentation](https://pressly.github.io/goose/documentation/cli-commands/)
 describes the CLI commands.
 
-### Railway storage
+### Persistent storage and backups
 
-Mount a persistent Railway volume at `/data`, writable by container UID/GID
-`65532:65532`, and keep `DATABASE_PATH=/data/screamtober.db`. Railway supplies
-`RAILWAY_VOLUME_MOUNT_PATH`; when `RAILWAY_PROJECT_ID` is present, startup rejects
-a missing volume configuration or a database path outside that volume. Use direct
-paths within the mount, without symlinks to other storage. The app validates path
-configuration; deployment must still verify that a persistent volume is mounted.
+In both Docker modes, mount persistent storage at `/data`, writable by container
+UID/GID `65532:65532`. The examples use the named volume `screamtober-data`.
+For a different mount location, set `DATABASE_DIR` to that location. Use direct
+paths without symlinks to other storage. Existing deployments using a custom
+database filename must arrange for that database to be named `screamtober.db`
+in the configured directory before starting this version; the app does not
+automatically move or rename existing data.
 
-Run one application instance. Do not enable a public Railway endpoint: route
-public traffic through Cloudflare Tunnel to the application's private address.
-The Docker port mapping above is only for local testing.
+The app does not verify whether the directory is a persistent mount.
+Deployment must verify the mount and preserve it across container replacement.
+Local Go runs without a volume setting use `data/screamtober.db`.
 
-Keep Railway volume snapshots and periodic portable SQLite backups using a
-SQLite-consistent method (for example, SQLite's `.backup` command). Do not copy a
-live database file without its WAL state. Verify restoration to a separate database
-before relying on backups; backup scheduling is not configured by this setup.
+Keep volume snapshots where available and periodic portable SQLite backups using
+a SQLite-consistent method, such as SQLite's `.backup` command. Do not copy a
+live database file without its WAL state. Verify restoration to a separate
+database before relying on backups; backup scheduling is not configured here.
 
 ## SQL queries
 

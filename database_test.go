@@ -59,25 +59,17 @@ func TestDatabasePersistenceAndMigrations(t *testing.T) {
 }
 
 func TestDatabasePath(t *testing.T) {
-	volume := t.TempDir()
-	for _, tt := range []struct {
-		name, path, volume string
-		railway, wantError bool
-	}{
-		{name: "local default"},
-		{name: "volume default", volume: volume, railway: true},
-		{name: "volume explicit", path: filepath.Join(volume, "app.db"), volume: volume, railway: true},
-		{name: "missing volume", railway: true, wantError: true},
-		{name: "outside volume", path: filepath.Join(volume, "..", "app.db"), volume: volume, railway: true, wantError: true},
-		{name: "volume itself", path: volume, volume: volume, railway: true, wantError: true},
+	directory := t.TempDir()
+	for _, tt := range []struct{ name, directory, want string }{
+		{"local default", "", filepath.Join("data", "screamtober.db")},
+		{"custom directory", directory, filepath.Join(directory, "screamtober.db")},
+		{"relative directory", "custom-data", filepath.Join("custom-data", "screamtober.db")},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			path, err := databasePath(tt.path, tt.volume, tt.railway)
-			if (err != nil) != tt.wantError {
-				t.Fatalf("path = %q, error = %v", path, err)
-			}
-			if err == nil && !filepath.IsAbs(path) {
-				t.Fatalf("database path is not absolute: %q", path)
+			got, err := databasePath(tt.directory)
+			want, absErr := filepath.Abs(tt.want)
+			if err != nil || absErr != nil || got != want {
+				t.Fatalf("path = %q, want %q, error = %v", got, want, err)
 			}
 		})
 	}

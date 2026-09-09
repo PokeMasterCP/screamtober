@@ -15,6 +15,6 @@ COPY --from=build /out/screamtober /screamtober
 COPY --from=build --chown=65532:65532 /out/data /data
 USER 65532:65532
 ENV ADDR=:8080
-ENV DATABASE_PATH=/data/screamtober.db
+ENV DATABASE_DIR=/data
 EXPOSE 8080
 ENTRYPOINT ["/screamtober"]
