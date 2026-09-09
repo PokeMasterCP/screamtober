@@ -2,10 +2,11 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/url"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -20,27 +21,38 @@ type movieSearcher interface {
 type movieSearchHandler struct {
 	admin  *adminHandler
 	movies movieSearcher
+	cache  movieSearchCache
 }
 
 type movieSearchPage struct {
-	Query string
-	Error string
-	JSON  string
-	Empty bool
+	Query     string
+	Error     string
+	Results   []movieChoice
+	Reference string
+	Previous  string
+	Next      string
+	Page      int
+	Notice    string
+	Searched  bool
+	Empty     bool
 }
 
 func (h *movieSearchHandler) search(w http.ResponseWriter, r *http.Request) {
 	data := movieSearchPage{Query: strings.TrimSpace(r.URL.Query().Get("q"))}
 	status := http.StatusOK
+	page := 1
+	if raw := r.URL.Query().Get("page"); raw != "" {
+		page, _ = strconv.Atoi(raw)
+	}
 	if r.URL.Query().Has("q") {
-		if data.Query == "" || !utf8.ValidString(data.Query) || utf8.RuneCountInString(data.Query) > 200 {
+		if page < 1 || page > 500 || data.Query == "" || !utf8.ValidString(data.Query) || utf8.RuneCountInString(data.Query) > 200 {
 			data.Error = "Enter a movie title between 1 and 200 characters."
 			status = http.StatusBadRequest
 			setRequestEvent(r, slog.LevelWarn, "movie search", "outcome", "invalid_query")
 		} else {
 			// Leave time to render within the server's ten-second write timeout.
 			ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
-			results, err := h.movies.SearchMovies(ctx, data.Query, tmdb.SearchOptions{})
+			results, err := h.movies.SearchMovies(ctx, data.Query, tmdb.SearchOptions{Page: page})
 			cancel()
 			if err != nil {
 				status = http.StatusBadGateway
@@ -58,16 +70,38 @@ func (h *movieSearchHandler) search(w http.ResponseWriter, r *http.Request) {
 				}
 				setRequestEvent(r, slog.LevelWarn, "movie search", "outcome", outcome, "search_term", data.Query)
 			} else {
-				body, err := json.MarshalIndent(results, "", "  ")
-				if err != nil {
-					h.admin.fail(w, r, "encode movie search", err)
-					return
-				}
-				data.JSON = string(body)
+				data.Searched = true
+				data.Page = page
 				data.Empty = len(results.Results) == 0
+				for _, movie := range results.Results {
+					year := "Year unknown"
+					if movie.ReleaseDate != nil {
+						if date, err := time.Parse("2006-01-02", *movie.ReleaseDate); err == nil {
+							year = date.Format("2006")
+						}
+					}
+					data.Results = append(data.Results, movieChoice{ID: movie.ID, Title: movie.Title, Year: year})
+				}
+				session, _ := cookieKey(r, adminSessionCookie)
+				data.Reference = h.cache.put(session, data.Query, results.Results)
+				link := func(p int) string {
+					return "/admin/movies/search?" + url.Values{"q": {data.Query}, "page": {strconv.Itoa(p)}}.Encode()
+				}
+				if page > 1 {
+					data.Previous = link(page - 1)
+				}
+				if page < results.TotalPages && page < 500 {
+					data.Next = link(page + 1)
+				}
+
 				setRequestEvent(r, slog.LevelInfo, "movie search", "outcome", "success", "search_term", data.Query)
 			}
 		}
 	}
 	h.admin.render(w, r, "admin_movie_search.html", status, data)
+}
+
+type movieChoice struct {
+	ID          int64
+	Title, Year string
 }

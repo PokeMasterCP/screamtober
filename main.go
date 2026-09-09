@@ -31,6 +31,7 @@ func newHandlerWithMovieSearch(auth *auth, db *sql.DB, movies movieSearcher) (ht
 	mux := http.NewServeMux()
 	admin := &adminHandler{db: db, queries: store.New(db), auth: auth, pages: pages}
 	search := &movieSearchHandler{admin: admin, movies: movies}
+	mux.Handle("POST /admin/movies", auth.requireAdmin(http.HandlerFunc(search.add)))
 	mux.Handle("GET /admin/movies/search", auth.requireAdmin(http.HandlerFunc(search.search)))
 	mux.HandleFunc("GET /admin/login", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")

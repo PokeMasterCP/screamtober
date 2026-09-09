@@ -9,7 +9,11 @@
     .search-row { display: flex; align-items: start; gap: .75rem; margin-top: .3rem; }
     .search-row input { flex: 1; min-width: 0; margin: 0; }
     .search-row button { flex-shrink: 0; }
-    pre { max-width: 100%; padding: 1rem; border: 1px solid var(--line); background: white; white-space: pre-wrap; overflow-wrap: anywhere; font: .9rem/1.6 monospace; }
+    fieldset { border: 0; padding: 0; margin: 1rem 0; }
+    .movie-option { display: flex; align-items: center; gap: .8rem; padding: .85rem 0; border-bottom: 1px solid var(--line); margin: 0; cursor: pointer; }
+    .movie-option input { width: auto; margin: 0; accent-color: var(--accent); }
+    .movie-option small { font-weight: normal; color: #63574d; }
+    .pagination { margin-top: 1.5rem; }
     .credits { margin-top: 2rem; font-size: .85rem; }
     @media (max-width: 28rem) { .search-row { flex-direction: column; } .search-row button { width: 100%; } }
   </style>
@@ -30,12 +34,27 @@
     </div>
   </form>
   {{if .Error}}<p class="error" id="search-error" role="alert">{{.Error}}</p>{{end}}
-  {{if .JSON}}
+  {{if .Notice}}<p role="status">{{.Notice}}</p>{{end}}
+  {{if .Searched}}
   <section aria-labelledby="results-heading">
     <h2 id="results-heading">Search results</h2>
-    {{if .Empty}}<p>No movies found. Try a different title.</p>{{end}}
-    <p class="muted">First page of results. Searching does not save movies.</p>
-    <pre><code>{{.JSON}}</code></pre>
+    {{if .Empty}}<p>No movies found. Try a different title.</p>{{else}}
+    <form method="post" action="/admin/movies">
+      <input type="hidden" name="search_reference" value="{{.Reference}}">
+      <fieldset>
+        <legend>Select one movie to add to your catalog</legend>
+        {{range .Results}}
+        <label class="movie-option"><input type="radio" name="movie_id" value="{{.ID}}" required><span>{{.Title}} <small>({{.Year}})</small></span></label>
+        {{end}}
+      </fieldset>
+      <button type="submit">Add to catalog</button>
+    </form>
+    {{end}}
+    <nav class="pagination" aria-label="Search results pages">
+      {{if .Previous}}<a href="{{.Previous}}">Previous</a>{{end}}
+      <span>Page {{.Page}}</span>
+      {{if .Next}}<a href="{{.Next}}">Next</a>{{end}}
+    </nav>
   </section>
   {{end}}
   <footer class="credits" aria-label="Credits">

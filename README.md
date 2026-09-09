@@ -80,9 +80,10 @@ rejected credentials, rate limits, and upstream failures without exposing the
 key or upstream error bodies. Requests are not automatically retried.
 
 Sign in as administrator and choose **Search movies**, or open
-`/admin/movies/search`. Enter a title and submit to display the first page of
-search results as formatted JSON. Empty searches and upstream failures display
-feedback on the same page. This is read-only and does not save movies.
+`/admin/movies/search`. Enter a title, browse the result pages, and select a movie by title and release
+year. Click **Add to catalog** to save it. Movies already in the catalog are
+not duplicated or overwritten. Adding a movie does not add it to a yearly watchlist.
+If your results expire (after ten minutes) or the app restarts, search again.
 Personal sessions and visitors cannot access this admin tool.
 
 Set `TMDB_API_KEY` in the web server environment and restart the app. In Docker,
@@ -90,7 +91,7 @@ add `-e TMDB_API_KEY` to either deployment command after exporting the variable.
 The web app still starts without the key and serves cached challenge data;
 search displays a configuration message until the key is supplied. The CLI
 commands remain local developer tools and are not bundled in the Docker image.
-Movie selection and saving will follow later.
+Watchlist editing will follow later.
 
 ## Logging
 
