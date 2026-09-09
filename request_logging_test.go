@@ -108,3 +108,63 @@ func TestLoggedResponseFlush(t *testing.T) {
 		t.Fatal("flush did not preserve implicit OK status")
 	}
 }
+
+func TestTrustedClientIP(t *testing.T) {
+	for _, tt := range []struct {
+		name, config, peer string
+		headers            []string
+		want               string
+	}{
+		{"disabled", "", "10.0.0.2:1234", []string{"192.0.2.1"}, "10.0.0.2"},
+		{"trusted IPv4", "true", "10.0.0.2:1234", []string{"192.0.2.1"}, "192.0.2.1"},
+		{"trusted IPv6", "true", "[fd00::2]:1234", []string{"2001:db8::1"}, "2001:db8::1"},
+		{"disabled explicitly", "false", "10.0.0.3:1234", []string{"192.0.2.1"}, "10.0.0.3"},
+		{"missing", "true", "10.0.0.2:1234", nil, "10.0.0.2"},
+		{"invalid", "true", "10.0.0.2:1234", []string{"invalid"}, "10.0.0.2"},
+		{"list", "true", "10.0.0.2:1234", []string{"192.0.2.1, 192.0.2.2"}, "10.0.0.2"},
+		{"duplicate", "true", "10.0.0.2:1234", []string{"192.0.2.1", "192.0.2.2"}, "10.0.0.2"},
+		{"port", "true", "10.0.0.2:1234", []string{"192.0.2.1:80"}, "10.0.0.2"},
+		{"zone", "true", "10.0.0.2:1234", []string{"fe80::1%eth0"}, "10.0.0.2"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			tunnel, err := parseCloudflareTunnel(tt.config)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var output bytes.Buffer
+			logger, _ := newLogger(&output, "info")
+			h := trustedClientIP(tunnel, requestLogging(logger, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})))
+			r := httptest.NewRequest("GET", "/", nil)
+			r.RemoteAddr = tt.peer
+			for _, value := range tt.headers {
+				r.Header.Add("CF-Connecting-IP", value)
+			}
+			r.Header.Set("X-Forwarded-For", "192.0.2.99")
+			h.ServeHTTP(httptest.NewRecorder(), r)
+			var event map[string]any
+			if err := json.Unmarshal(output.Bytes(), &event); err != nil {
+				t.Fatal(err)
+			}
+			if event["ip"] != tt.want {
+				t.Fatalf("ip = %v, want %s", event["ip"], tt.want)
+			}
+		})
+	}
+}
+
+func TestParseCloudflareTunnel(t *testing.T) {
+	for _, value := range []string{"garbage", "enabled", "true,false"} {
+		if _, err := parseCloudflareTunnel(value); err == nil {
+			t.Fatalf("accepted %q", value)
+		}
+	}
+	for _, tt := range []struct {
+		value string
+		want  bool
+	}{{"", false}, {"false", false}, {"true", true}} {
+		got, err := parseCloudflareTunnel(tt.value)
+		if err != nil || got != tt.want {
+			t.Fatalf("%q = %v, %v", tt.value, got, err)
+		}
+	}
+}

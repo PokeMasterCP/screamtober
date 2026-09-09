@@ -98,7 +98,7 @@ func TestChallengeEscapingAndSignedInState(t *testing.T) {
 	r := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(url.Values{"token": {testToken}}.Encode()))
 	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	h.ServeHTTP(login, r)
-	if login.Code != http.StatusSeeOther {
+	if login.Code != http.StatusOK {
 		t.Fatalf("login = %d", login.Code)
 	}
 	for _, signedIn := range []bool{false, true} {

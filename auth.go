@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"html/template"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -230,7 +231,7 @@ func (a *auth) login(w http.ResponseWriter, r *http.Request) {
 	a.clearAdminCookies(w)
 	a.setCookie(w, sessionCookie, "/", value, sessionLifetime, expiry)
 	setRequestEvent(r, slog.LevelInfo, "login successful", "user_id", user.ID)
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	loginSuccess(w, r, false)
 }
 
 func (a *auth) startAdminSession(w http.ResponseWriter, r *http.Request) {
@@ -261,7 +262,7 @@ func (a *auth) startAdminSession(w http.ResponseWriter, r *http.Request) {
 	a.setCookie(w, adminSessionCookie, "/admin", "", -time.Second, time.Unix(1, 0))
 	a.setCookie(w, adminSessionCookie, "/", value, adminSessionLifetime, expiry)
 	setRequestEvent(r, slog.LevelInfo, "admin login successful")
-	http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
+	loginSuccess(w, r, true)
 }
 
 func (a *auth) setCookie(w http.ResponseWriter, name, path, value string, lifetime time.Duration, expiry time.Time) {
@@ -319,4 +320,15 @@ func (a *auth) adminLogout(w http.ResponseWriter, r *http.Request) {
 func (a *auth) clearAdminCookies(w http.ResponseWriter) {
 	a.setCookie(w, adminSessionCookie, "/", "", -time.Second, time.Unix(1, 0))
 	a.setCookie(w, adminSessionCookie, "/admin", "", -time.Second, time.Unix(1, 0))
+}
+
+// A confirmation response completes sign-in without an automatic second request.
+var loginSuccessPage = template.Must(template.ParseFS(templateFiles, "templates/login_success.html", "templates/admin_style.html"))
+
+func loginSuccess(w http.ResponseWriter, r *http.Request, admin bool) {
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := loginSuccessPage.ExecuteTemplate(w, "login_success.html", admin); err != nil {
+		setRequestEvent(r, slog.LevelError, "render login confirmation failed", "error", err)
+	}
 }

@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Signed in · Screamtober</title>
+    {{template "admin_style"}}
+  </head>
+  <body>
+    <main>
+      <h1>Signed in</h1>
+      {{if .}}
+      <p>You are signed in as administrator.</p>
+      <p><a href="/admin/users">Continue to household management</a></p>
+      {{else}}
+      <p>You are signed in to Screamtober.</p>
+      <p><a href="/">Continue to the movie challenge</a></p>
+      {{end}}
+    </main>
+  </body>
+</html>
