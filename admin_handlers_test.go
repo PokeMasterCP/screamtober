@@ -68,7 +68,7 @@ func portalRequest(h http.Handler, method, path string, form url.Values, cookies
 func adminCookie(t *testing.T, h http.Handler) *http.Cookie {
 	t.Helper()
 	w := authRequest(h, http.MethodPost, "/login", testAdminToken, nil)
-	if w.Code != http.StatusSeeOther || w.Header().Get("Location") != "/admin/users" {
+	if w.Code != http.StatusOK || w.Header().Get("Location") != "" {
 		t.Fatalf("admin login = %d %s", w.Code, w.Body.String())
 	}
 	return activeSessionCookie(t, w, adminSessionCookie)
@@ -77,7 +77,7 @@ func adminCookie(t *testing.T, h http.Handler) *http.Cookie {
 func personalCookie(t *testing.T, h http.Handler, token string) *http.Cookie {
 	t.Helper()
 	w := authRequest(h, http.MethodPost, "/login", token, nil)
-	if w.Code != http.StatusSeeOther {
+	if w.Code != http.StatusOK {
 		t.Fatalf("personal login = %d %s", w.Code, w.Body.String())
 	}
 	return activeSessionCookie(t, w, sessionCookie)
@@ -148,7 +148,7 @@ func TestAdminOnboardingAndPermissionSeparation(t *testing.T) {
 	// Entering admin mode must revoke the existing personal session server-side.
 	promotion := authRequest(h, "POST", "/login", testAdminToken, personal)
 	admin = activeSessionCookie(t, promotion, adminSessionCookie)
-	if promotion.Header().Get("Location") != "/admin/users" {
+	if promotion.Code != http.StatusOK || promotion.Header().Get("Location") != "" {
 		t.Fatal("admin token did not select admin mode")
 	}
 	if w := portalRequest(h, "GET", "/test/protected", nil, personal); w.Code != 401 {
@@ -413,11 +413,11 @@ func TestUnifiedSignInBrowserCookies(t *testing.T) {
 		}
 	}
 	endpoint, _ := url.Parse(server.URL + "/login")
-	post("/login", testToken, "/")
+	post("/login", testToken, "/login")
 	if cookies := jar.Cookies(endpoint); len(cookies) != 1 || cookies[0].Name != sessionCookie {
 		t.Fatal("personal cookie state incorrect")
 	}
-	post("/login", testAdminToken, "/admin/users")
+	post("/login", testAdminToken, "/login")
 	if cookies := jar.Cookies(endpoint); len(cookies) != 1 || cookies[0].Name != adminSessionCookie {
 		t.Fatal("admin cookie must replace personal cookie and cover product paths")
 	}
@@ -441,5 +441,5 @@ func TestUnifiedSignInBrowserCookies(t *testing.T) {
 	if len(jar.Cookies(endpoint)) != 0 {
 		t.Fatal("logout left a session cookie behind")
 	}
-	post("/login", testToken, "/")
+	post("/login", testToken, "/login")
 }

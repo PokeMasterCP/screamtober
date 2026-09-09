@@ -41,41 +41,40 @@ The application supports one owner and up to three additional authenticated user
 - **Frontend:** Server-rendered HTML and CSS
 - **Movie metadata:** TMDB API
 - **Packaging:** Docker
-- **Hosting:** Railway, with Cloudflare as the public entry point
+- **Hosting:** Any environment supporting Docker, with optional Cloudflare Tunnel
 
 Follow existing repository conventions. Prefer the current stack and small, focused dependencies. Discuss new frameworks, infrastructure services, or major dependencies before introducing them.
 
 ## Deployment architecture
 
-```text
-Browser
-  │ HTTPS
-  ▼
-Cloudflare edge
-  │ Cloudflare Tunnel (encrypted outbound tunnel)
-  ▼
-cloudflared on Railway
-  │ Railway private network
-  ▼
-Go application on Railway
-  │ Local database access
-  ▼
-SQLite on a Railway persistent volume
-```
+Support two deployment methods, both using the same Docker image:
 
-Responses return through the same proxy path. `cloudflared` initiates the outbound connection to Cloudflare; the Go service is reachable through Railway's private network.
+1. **With Cloudflare Tunnel:** Browser → Cloudflare HTTPS edge → outbound tunnel → cloudflared → Go application on a private network → SQLite on a persistent volume.
+2. **Without Cloudflare Tunnel:** Browser → operator-managed HTTPS ingress → Go application → SQLite on a persistent volume. Local HTTP is supported for development.
+
+Keep code and documentation hosting-provider neutral. Do not introduce provider-specific environment detection or requirements.
 
 ### Required security and persistence boundaries
 
-- The Go application **must not expose a public Railway endpoint**. All public application traffic must enter through Cloudflare.
-- Cloudflare provides public TLS termination and the configured edge protections: DDoS protection, WAF, rate limiting, bot protection, and security rules. Do not assume a protection is active merely because traffic passes through Cloudflare.
-- The Go application remains responsible for authentication, authorization, input validation, session security, and protection against cross-site request forgery on state-changing requests.
-- State-changing actions must not use GET requests.
-- Trust forwarded client and scheme information only through the configured trusted proxy path.
-- SQLite must not be network-accessible. Its database file **must reside on the mounted Railway persistent volume**, not the container's ephemeral filesystem.
-- Keep database credentials where applicable, TMDB credentials, tunnel tokens, and other secrets out of source control, client responses, and logs. Use runtime configuration for secrets.
-- Backups should include Railway volume snapshots and periodic portable SQLite backups. Use a SQLite-consistent backup method rather than copying a live database file without accounting for its journal or WAL. Verify restoration before relying on a backup process.
-- Do not introduce multiple application instances that assume independent local SQLite files share state. Discuss scaling or storage changes first.
+- `CLOUDFLARE_TUNNEL=true` enables trust in `CF-Connecting-IP`. In this mode the Go application must have no public ingress that bypasses the tunnel. Infrastructure establishes the trusted path; internal services with access to the app must be trusted. Do not require proxy CIDR configuration.
+- With `CLOUDFLARE_TUNNEL` unset or false, use the socket peer IP and ignore forwarded IP headers. A reverse proxy may therefore appear as the client in logs. Do not infer trust from a header's presence.
+- In tunnel mode, use a single valid IPv4 or IPv6 `CF-Connecting-IP` value; missing, malformed, or duplicate values fall back to the socket peer IP. The setting does not create a tunnel or enable forwarded scheme trust.
+- Without a tunnel, the operator controls public ingress, HTTPS termination, and edge protections. The Go server serves HTTP; hosted deployments need HTTPS termination in front of it.
+- Cloudflare protections depend on the configured service and rules. Do not assume WAF, rate limiting, or bot protection is active merely because traffic passes through Cloudflare.
+- In both modes the Go application remains responsible for authentication, authorization, input validation, session security, and CSRF protection. State-changing actions must not use GET requests.
+- Keep secure cookies enabled for hosted HTTPS. `AUTH_INSECURE_COOKIE=true` is only for local HTTP development.
+- SQLite must not be network-accessible. Its database file must reside on a mounted persistent volume, not the container's ephemeral filesystem.
+- Use one storage setting, `DATABASE_DIR`: Docker defaults to `/data`, local Go runs to `data`. Always open `screamtober.db` directly inside that directory; do not search for databases or select another file. Deployment must verify that persistent storage is actually mounted.
+- Docker environment values are overridable defaults. Keep `ADDR`, `DATABASE_DIR`, `CLOUDFLARE_TUNNEL`, `ADMIN_TOKEN`, `AUTH_INSECURE_COOKIE`, and `LOG_LEVEL` configurable at runtime.
+- Keep TMDB credentials, tunnel tokens, and other secrets out of source control, client responses, and logs. Use runtime configuration for secrets.
+- Use volume snapshots where available and periodic SQLite-consistent portable backups. Do not copy a live database file without accounting for its journal or WAL. Verify restoration before relying on backups.
+- Run one application instance. Discuss scaling or storage changes before introducing multiple instances with independent SQLite files.
+
+## Logging
+
+Prefer one event per log record, and one completion event per HTTP request. Enrich that completion event with the operation, outcome, and relevant error instead of emitting separate handler and access logs for the same event. Independent startup and lifecycle events get their own records.
+
+Use structured JSON with request ID, client IP, method, path, status, duration, and response size. Do not log tokens, cookies, authorization headers, request bodies, or query strings. Successful login returns a 200 confirmation page with a continuation link, avoiding an automatic redirect GET. Explicit navigation remains a separate logged request; do not suppress real requests merely to reduce log count.
 
 ## Implementation guidance
 
@@ -104,6 +103,8 @@ Responses return through the same proxy path. `cloudflared` initiates the outbou
 
 ## Development workflow
 
+Use your judgment and voice concerns when a proposed choice is unsafe, unnecessarily complex, or likely to cause problems. Explain the concrete tradeoff and suggest a simpler or safer alternative. Do not agree reflexively; continue routine work without unnecessary approval requests.
+
 1. Read the relevant code, repository instructions, configuration, and tests before changing behavior. Use documented commands and pinned tool versions; do not invent repository paths or commands.
 2. Implement the smallest coherent change that satisfies the requested task. Avoid unrelated refactoring, formatting churn, or speculative features.
 3. For larger tasks, explain a short sequence of steps before implementation and work incrementally.
@@ -117,6 +118,6 @@ Responses return through the same proxy path. `cloudflared` initiates the outbou
 - Add or update focused tests for changed behavior, especially permission enforcement, year isolation, ratings, and data integrity. Do not add tests that only repeat implementation details.
 - For database changes, regenerate affected `sqlc` code and validate migrations against a disposable database, including upgrades from an existing schema when relevant.
 - For UI changes, verify the affected pages and forms, including validation errors and relevant authenticated and unauthenticated states.
-- For deployment changes, verify that public ingress remains restricted to Cloudflare and database storage remains persistent.
+- For deployment changes, verify both Docker modes: tunnel ingress stays private, normal ingress does not trust forwarded IP headers, and database storage remains persistent in both.
 - Never run destructive validation against production data.
 - At completion, summarize what changed, what was checked, and any remaining limitations or decisions. Clearly distinguish checks that passed from checks that could not be run.

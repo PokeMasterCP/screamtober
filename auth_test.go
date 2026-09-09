@@ -141,7 +141,7 @@ func authRequest(h http.Handler, method, path, token string, cookie *http.Cookie
 func loginCookie(t *testing.T, h http.Handler) *http.Cookie {
 	t.Helper()
 	w := authRequest(h, "POST", "/login", testToken, nil)
-	if w.Code != http.StatusSeeOther {
+	if w.Code != http.StatusOK {
 		t.Fatalf("login status: %d", w.Code)
 	}
 	return activeSessionCookie(t, w, sessionCookie)
@@ -253,5 +253,35 @@ func TestAuthConfigurationAndInput(t *testing.T) {
 	}
 	if w := authRequest(h, "POST", "/login?token="+testToken, "", nil); w.Header().Get("Location") != "/login?error=invalid" || len(w.Result().Cookies()) != 0 {
 		t.Fatal("query token accepted")
+	}
+}
+
+func TestSuccessfulLoginConfirmation(t *testing.T) {
+	for _, tt := range []struct{ name, token, link string }{
+		{"personal", testToken, `href="/"`},
+		{"admin", testAdminToken, `href="/admin/users"`},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			_, h := authFixture(t, testToken, true)
+			var output bytes.Buffer
+			logger, _ := newLogger(&output, "info")
+			w := authRequest(requestLogging(logger, h), "POST", "/login", tt.token, nil)
+			if w.Code != http.StatusOK || w.Header().Get("Location") != "" {
+				t.Fatalf("login = %d, location = %q", w.Code, w.Header().Get("Location"))
+			}
+			if !strings.Contains(w.Body.String(), tt.link) || !strings.Contains(w.Body.String(), "Signed in") {
+				t.Fatalf("missing confirmation/navigation: %s", w.Body.String())
+			}
+			if w.Header().Get("Cache-Control") != "no-store" || !strings.Contains(w.Header().Get("Content-Type"), "text/html") {
+				t.Fatalf("unexpected headers: %v", w.Header())
+			}
+			var event map[string]any
+			if err := json.Unmarshal(output.Bytes(), &event); err != nil {
+				t.Fatal(err)
+			}
+			if event["status"] != float64(200) || !strings.Contains(event["message"].(string), "login successful") {
+				t.Fatalf("unexpected event: %v", event)
+			}
+		})
 	}
 }

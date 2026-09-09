@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/pressly/goose/v3"
 	_ "modernc.org/sqlite"
@@ -18,30 +17,14 @@ import (
 //go:embed migrations/*.sql
 var migrationFiles embed.FS
 
-func databasePath(path, volume string, railway bool) (string, error) {
-	if railway && volume == "" {
-		return "", fmt.Errorf("Railway requires a persistent volume (RAILWAY_VOLUME_MOUNT_PATH)")
+// databasePath uses one fixed filename; never discover or select other databases.
+func databasePath(directory string) (string, error) {
+	if directory == "" {
+		directory = "data"
 	}
-	if path == "" {
-		if volume != "" {
-			path = filepath.Join(volume, "screamtober.db")
-		} else {
-			path = "data/screamtober.db"
-		}
-	}
-	path, err := filepath.Abs(path)
+	path, err := filepath.Abs(filepath.Join(directory, "screamtober.db"))
 	if err != nil {
 		return "", fmt.Errorf("resolve database path: %w", err)
-	}
-	if volume != "" {
-		root, err := filepath.Abs(volume)
-		if err != nil {
-			return "", fmt.Errorf("resolve volume path: %w", err)
-		}
-		rel, err := filepath.Rel(root, path)
-		if err != nil || rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-			return "", fmt.Errorf("DATABASE_PATH must be a file inside RAILWAY_VOLUME_MOUNT_PATH")
-		}
 	}
 	return path, nil
 }
