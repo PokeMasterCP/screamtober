@@ -57,15 +57,32 @@ or empty. Image paths are TMDB-relative paths, not complete image URLs.
 It uses TMDB's [movie details endpoint](https://developer.themoviedb.org/reference/movie-details)
 and [API key authentication](https://developer.themoviedb.org/docs/authentication-application).
 
+Search by title using the same environment variable:
+
+```sh
+go run ./cmd/movie-search "Halloween"
+go run ./cmd/movie-search -year 1978 "Halloween"
+go run ./cmd/movie-search -page 2 "Halloween"
+```
+
+Put flags before the quoted title. The command uses TMDB's
+[movie search endpoint](https://developer.themoviedb.org/reference/search-movie)
+and returns JSON with matching titles, TMDB IDs, release dates, overviews, and
+poster paths, plus page and total counts. `-year` filters the primary release
+year. Searches exclude adult results and fetch one page at a time (default 1,
+maximum 500); an empty results array means no matches. Select an ID and use
+`movie-info` for full details. The client exposes this as
+`SearchMovies(ctx, title, tmdb.SearchOptions{Year: 1978})`.
+
 The reusable `internal/tmdb` client accepts a context and has a ten-second HTTP
 timeout. It reports missing configuration, invalid IDs, unavailable movies,
 rejected credentials, rate limits, and upstream failures without exposing the
 key or upstream error bodies. Requests are not automatically retried.
 
-This first integration is a local developer command; it does not open SQLite,
-save movies, or expose a web route, and it is not bundled in the Docker image.
+These integrations are local developer commands; they do not open SQLite,
+save movies, or expose a web route, and they are not bundled in the Docker image.
 The web app still runs without `TMDB_API_KEY` and serves cached challenge data.
-Search, movie-entry forms, and TMDB attribution in those forms will follow when
+Movie-entry forms and TMDB attribution in those forms will follow when
 metadata is integrated into the UI.
 
 ## Logging

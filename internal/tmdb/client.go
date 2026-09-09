@@ -68,43 +68,55 @@ func (c *Client) GetMovie(ctx context.Context, id int64) (Movie, error) {
 	if id <= 0 || id > 1<<31-1 {
 		return Movie{}, ErrInvalidID
 	}
-	if c.apiKey == "" {
-		return Movie{}, ErrNotConfigured
+	var movie Movie
+	if err := c.get(ctx, "/movie/"+strconv.FormatInt(id, 10), url.Values{}, &movie); err != nil {
+		return Movie{}, err
 	}
-	query := url.Values{"api_key": {c.apiKey}, "language": {"en-US"}}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/movie/"+strconv.FormatInt(id, 10)+"?"+query.Encode(), nil)
+	if movie.ID != id || strings.TrimSpace(movie.Title) == "" {
+		return Movie{}, ErrInvalidResponse
+	}
+	return movie, nil
+}
+
+// get shares bounded HTTP requests and sanitized errors across TMDB endpoints.
+func (c *Client) get(ctx context.Context, path string, query url.Values, result any) error {
+	if c.apiKey == "" {
+		return ErrNotConfigured
+	}
+	query.Set("api_key", c.apiKey)
+	query.Set("language", "en-US")
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+path+"?"+query.Encode(), nil)
 	if err != nil {
-		return Movie{}, ErrUnavailable
+		return ErrUnavailable
 	}
 	req.Header.Set("Accept", "application/json")
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		if ctx.Err() != nil {
-			return Movie{}, ctx.Err()
+			return ctx.Err()
 		}
 		// http.Client errors can contain the complete URL, including api_key.
-		return Movie{}, ErrUnavailable
+		return ErrUnavailable
 	}
 	defer resp.Body.Close()
 	switch resp.StatusCode {
 	case http.StatusOK:
 	case http.StatusNotFound:
-		return Movie{}, ErrNotFound
+		return ErrNotFound
 	case http.StatusUnauthorized, http.StatusForbidden:
-		return Movie{}, ErrUnauthorized
+		return ErrUnauthorized
 	case http.StatusTooManyRequests:
-		return Movie{}, ErrRateLimited
+		return ErrRateLimited
 	default:
-		return Movie{}, fmt.Errorf("%w (HTTP %d)", ErrUnavailable, resp.StatusCode)
+		return fmt.Errorf("%w (HTTP %d)", ErrUnavailable, resp.StatusCode)
 	}
 	const maxResponseBytes = 1 << 20
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes+1))
 	if err != nil {
-		return Movie{}, ErrUnavailable
+		return ErrUnavailable
 	}
-	var movie Movie
-	if len(body) > maxResponseBytes || json.Unmarshal(body, &movie) != nil || movie.ID != id || strings.TrimSpace(movie.Title) == "" {
-		return Movie{}, ErrInvalidResponse
+	if len(body) > maxResponseBytes || json.Unmarshal(body, result) != nil {
+		return ErrInvalidResponse
 	}
-	return movie, nil
+	return nil
 }
