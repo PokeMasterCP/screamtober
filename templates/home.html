@@ -21,12 +21,13 @@
       <p class="eyebrow">The October movie challenge</p>
       <h1>31 nights.<br>A little <span class="hero-accent">fright.</span></h1>
       <p class="hero-copy">A month of old favorites, new nightmares, and one very good reason to stay in. Welcome to our October watchlist.</p>
+      {{if .Challenge}}<a class="button secondary" href="#challenge-heading">View the lineup <span aria-hidden="true">↓</span></a>{{end}}
     </div>
     <div class="ticket" aria-hidden="true"><span class="ticket-top">OCTOBER · 01—31</span><span class="ticket-number">31</span><span class="section-label">Nights of fright<br>Admit the whole household</span></div>
   </div>
   {{if .Challenges}}
   <nav class="year-nav" aria-label="Challenge years">
-    <span class="section-label muted">The archives</span>
+    <span class="section-label muted">Challenge year</span>
     <ul>{{range .Challenges}}<li><a href="/challenges/{{.Year}}"{{if eq .ID $.Challenge.ID}} aria-current="page"{{end}}>{{.Year}}</a></li>{{end}}</ul>
   </nav>
   {{end}}
@@ -40,14 +41,14 @@
     <ol class="watchlist" role="list">
       {{range .Movies}}
       <li{{if .Position.Valid}} value="{{.Position.Int64}}"{{end}}>
-        <article class="movie-card">
-          <div class="movie-meta"><span class="slot">{{if .Position.Valid}}October {{printf "%02d" .Position.Int64}}{{else}}Unscheduled{{end}}</span><span class="badge{{if .WatchedAt.Valid}} watched{{end}}">{{if .WatchedAt.Valid}}Watched{{else}}Not watched yet{{end}}</span></div>
+        <article class="movie-card{{if .WatchedAt.Valid}} is-watched{{end}}">
+          <div class="movie-meta"><span class="slot">{{if .Position.Valid}}October {{printf "%02d" .Position.Int64}}{{else}}Unscheduled{{end}}</span><span class="badge{{if .WatchedAt.Valid}} watched{{end}}">{{if .WatchedAt.Valid}}<span aria-hidden="true">✓ </span>Watched{{else}}Not watched yet{{end}}</span></div>
           <h3>{{.Title}}</h3>
           {{if .ReleaseDate.Valid}}<p class="release">Released {{.ReleaseDate.String}}</p>{{end}}
-          {{if .Overview.Valid}}<p class="overview">{{.Overview.String}}</p>{{end}}
+          {{if .Overview.Valid}}<details class="synopsis"><summary>Read synopsis</summary><p class="overview">{{.Overview.String}}</p></details>{{end}}
           {{if .Ratings}}
           <p class="rating">Household rating: {{.Average}} / 5 ({{len .Ratings}} {{if eq (len .Ratings) 1}}rating{{else}}ratings{{end}})</p>
-          <ul class="ratings" aria-label="Individual ratings">{{range .Ratings}}<li>{{.DisplayName}}: {{.Score}} / 5</li>{{end}}</ul>
+          <ul class="ratings" aria-label="Individual ratings">{{range .Ratings}}<li><span>{{.DisplayName}}: {{.Score}} / 5</span><span class="stars" aria-hidden="true">{{if ge .Score 1}}★{{else}}☆{{end}}{{if ge .Score 2}}★{{else}}☆{{end}}{{if ge .Score 3}}★{{else}}☆{{end}}{{if ge .Score 4}}★{{else}}☆{{end}}{{if ge .Score 5}}★{{else}}☆{{end}}</span></li>{{end}}</ul>
           {{else}}<p class="rating muted">No ratings yet.</p>{{end}}
         </article>
       </li>

@@ -7,9 +7,10 @@
     {{template "admin_style"}}
   </head>
   <body>
+    <a class="skip-link" href="#content">Skip to content</a>
     <main class="auth-page">
       <div class="masthead"><span class="brand">Screamtober</span><span class="masthead-note">Admit one</span></div>
-      <div class="auth-panel panel">
+      <div class="auth-panel panel" id="content">
         <p class="eyebrow">The household entrance</p>
         <h1>Signed in</h1>
         {{if .}}

@@ -12,7 +12,7 @@
   <header id="content">
     <p class="eyebrow">Screamtober / Administration</p>
     <h1>Search movies</h1>
-    <p>Find a title in The Movie Database.</p>
+    <p>Choose a challenge year, then find a movie to add to its lineup.</p>
     {{template "admin_nav" "movies"}}
   </header>
   <form class="panel search-form" method="get" action="/admin/movies/search" role="search">
@@ -27,7 +27,7 @@
   {{if .Error}}<p class="error" id="search-error" role="alert">{{.Error}}</p>{{end}}
   {{if .Notice}}<p role="status">{{.Notice}}</p>{{end}}
   {{if .Searched}}
-  <section aria-labelledby="results-heading">
+  <section class="search-results" aria-labelledby="results-heading">
     <h2 id="results-heading">Search results</h2>
     {{if .Empty}}<p>No movies found. Try a different title.</p>{{else}}
     <form method="post" action="/admin/movies">
@@ -36,7 +36,7 @@
       <fieldset>
         <legend>Select one movie for {{.Year}}</legend>
         {{range .Results}}
-        <label class="movie-option"><input type="radio" name="movie_id" value="{{.ID}}" required><span>{{.Title}} <small>({{.Year}})</small></span></label>
+        <label class="movie-option"><input type="radio" name="movie_id" value="{{.ID}}" required><span class="result-title">{{.Title}} <small>({{.Year}})</small></span></label>
         {{end}}
       </fieldset>
       <button type="submit">Add to {{.Year}}</button>
