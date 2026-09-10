@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arrange {{.Year}} · Screamtober</title>
+{{template "admin_style"}}
+<style>
+.calendar-toolbar { display:flex; align-items:end; justify-content:space-between; gap:1rem; flex-wrap:wrap; margin-bottom:2rem; }
+.calendar-toolbar form { display:flex; align-items:end; gap:.75rem; }
+.calendar-toolbar label { margin:0; } .calendar-toolbar input { width:7rem; margin-bottom:0; }
+.arrangement { display:grid; grid-template-columns:13rem minmax(0,1fr); gap:2rem; align-items:start; }
+.tray { padding:0; position:sticky; top:1rem; } .tray h2 { font-size:1.7rem; }
+.tray p { font-size:.85rem; color:var(--muted); }
+.poster-tray { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.65rem; max-height:70vh; overflow:auto; padding:.4rem; min-height:9rem; border:1px dashed var(--line); }
+.calendar-board { padding:0; min-width:0; } .calendar-heading { display:flex; align-items:baseline; justify-content:space-between; gap:1rem; border-bottom:3px solid var(--accent); margin-bottom:1rem; }
+.calendar-heading h2 { font-size:3rem; margin-bottom:.6rem; } .calendar-heading span { color:var(--muted); font-size:.8rem; }
+.days { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:.5rem; }
+.day { min-width:0; min-height:11rem; background:var(--panel); border:1px solid var(--line); padding:.35rem; }
+.day-number { display:block; color:var(--muted); font:700 1.4rem 'Barlow Condensed',sans-serif; padding:.15rem .2rem .45rem; }
+.day:has(.poster-card) .day-number { color:var(--accent); }
+.day:not(:has(.poster-card))::after { content:'Drop here'; display:block; text-align:center; padding-top:2rem; color:#8b9283; font-size:.7rem; }
+.poster-card { min-width:0; padding:.3rem; border:1px solid #565d4c; background:#242920; }
+.poster-card[draggable=true] { cursor:grab; } .poster-card.dragging { opacity:.4; }
+.poster-art { aspect-ratio:2/3; position:relative; overflow:hidden; background:repeating-linear-gradient(135deg,#30372a,#30372a 1px,#242920 1px,#242920 9px); display:grid; place-items:center; }
+.poster-art span { min-width:0; max-width:100%; overflow-wrap:anywhere; color:var(--muted); text-align:center; padding:.5rem; font:700 1.2rem 'Barlow Condensed',sans-serif; text-transform:uppercase; }
+.poster-art img { position:absolute; width:100%; height:100%; object-fit:cover; }
+.poster-card h3 { font:600 .8rem/1.2 Barlow,sans-serif; margin:.5rem 0; }
+.poster-card label { font-size:.65rem; margin:0; color:var(--muted); } .poster-card select { font-size:.75rem; padding:.2rem; margin:.2rem 0 0; min-height:44px; }
+.drop-active { outline:2px solid var(--accent); outline-offset:1px; background:#343d25; }
+.save-bar { position:sticky; bottom:0; display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1rem; margin-top:2rem; background:#151715f5; border-top:1px solid var(--line); z-index:2; }
+.save-bar p { margin:0; font-size:.85rem; } .save-bar [role=status] { border:0; background:none; padding:0; }
+@media(max-width:65rem) { .arrangement { grid-template-columns:10rem minmax(0,1fr); gap:1rem; } .days { grid-template-columns:repeat(5,minmax(0,1fr)); } }
+@media(max-width:45rem) { .arrangement { grid-template-columns:1fr; } .tray { position:static; } .poster-tray { grid-template-columns:repeat(4,minmax(0,1fr)); max-height:24rem; } .days { grid-template-columns:repeat(4,minmax(0,1fr)); } }
+@media(max-width:30rem) { .days,.poster-tray { grid-template-columns:repeat(3,minmax(0,1fr)); } .calendar-heading h2 { font-size:2.5rem; } }
+</style>
+</head>
+<body><main>
+{{template "admin_masthead"}}
+<header id="content"><p class="eyebrow">Screamtober / Administration</p><h1>Arrange movies</h1><p>Give every movie its night. Drag a poster onto a day, or choose a day below its title. Dropping onto another movie swaps their spots.</p>{{template "admin_nav" "calendar"}}</header>
+<div class="calendar-toolbar"><form method="get" action="/admin/calendar"><div><label for="year">Challenge year</label><input id="year" name="year" type="number" min="1" max="9999" value="{{.Year}}" required></div><button class="secondary">Load year</button></form><a href="/admin/movies/search?year={{.Year}}">+ Add movies to {{.Year}}</a></div>
+{{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
+{{if .Saved}}<p role="status">Your {{.Year}} arrangement is saved.</p>{{end}}
+{{if not .Movies}}<div class="empty-state"><h2>The stage is yours.</h2><p>No movies added for {{.Year}} yet. Add a few, then give them a night.</p><a class="button" href="/admin/movies/search?year={{.Year}}">Find your first movie</a></div>{{end}}
+<form id="arrange" method="post" action="/admin/calendar?year={{.Year}}">
+<input type="hidden" name="revision" value="{{.Revision}}">
+<noscript><p>Choose days using the selectors below, then save. Each day can hold one movie.</p></noscript>
+<div class="arrangement">
+<section class="tray" aria-labelledby="tray-title"><p class="eyebrow">Waiting in the wings</p><h2 id="tray-title">Movie lineup</h2><p id="tray-help">Return a poster here to leave it unscheduled.</p><div class="poster-tray" data-day="" aria-label="Unscheduled movies">
+{{range .Movies}}{{$movie := .}}<article class="poster-card" data-entry="{{.ID}}" data-position="{{if .Position.Valid}}{{.Position.Int64}}{{end}}">
+<div class="poster-art"><span>Poster unavailable</span>{{if .PosterURL}}<img src="{{.PosterURL}}" alt="" loading="lazy" draggable="false" referrerpolicy="no-referrer">{{end}}</div>
+<h3>{{.Title}}</h3><label for="entry-{{.ID}}">Challenge day</label><select id="entry-{{.ID}}" name="entry_{{.ID}}" aria-label="Day for {{.Title}} (entry {{.ID}})"><option value="">Unscheduled</option>{{range $.Days}}<option value="{{.}}"{{if and $movie.Position.Valid (eq $movie.Position.Int64 .)}} selected{{end}}>Oct {{.}}</option>{{end}}</select>
+</article>{{end}}
+</div></section>
+<section class="calendar-board" aria-labelledby="calendar-title"><div class="calendar-heading"><h2 id="calendar-title">October / {{.Year}}</h2><span>31 nights. Your order.</span></div><div class="days">{{range .Days}}<div class="day" data-day="{{.}}" aria-label="October {{.}}"><span class="day-number">{{printf "%02d" .}}</span></div>{{end}}</div></section>
+</div>
+{{if .Movies}}<div class="save-bar"><p id="arrangement-status" role="status" aria-live="polite">{{len .Movies}} movies · Changes are saved when you choose Save.</p><button type="submit">Save arrangement</button></div>{{end}}
+</form>
+<footer class="credits"><a href="https://www.themoviedb.org"><img src="https://www.themoviedb.org/assets/v4/logos/v2/blue_short-8e7b30f73a4020692ccca9c88bafe5dcb6f8a62a4c6bc55cd9ba82bb2cd95f6c.svg" alt="TMDB" width="100" height="44" loading="lazy"></a><p>This product uses the TMDB API but is not endorsed or certified by TMDB.</p></footer>
+</main>
+<script>
+(() => {
+ const form = document.querySelector('#arrange');
+ const cards = [...form.querySelectorAll('.poster-card')];
+ const targets = [...form.querySelectorAll('[data-day]')];
+ const status = document.querySelector('#arrangement-status');
+ let dragged = null;
+ const initial = () => cards.map(card => card.dataset.position).join(',');
+ const saved = initial();
+ function place(card) { targets.find(target => target.dataset.day === card.dataset.position).append(card); }
+ function move(card, day) {
+  const old = card.dataset.position;
+  const other = day && cards.find(candidate => candidate !== card && candidate.dataset.position === day);
+  if (other) { other.dataset.position = old; other.querySelector('select').value = old; place(other); }
+  card.dataset.position = day; card.querySelector('select').value = day; place(card);
+  const count = cards.filter(candidate => candidate.dataset.position).length;
+  status.textContent = count + ' / 31 nights scheduled · ' + (initial() === saved ? 'No unsaved changes.' : 'Unsaved changes.');
+ }
+ cards.forEach(card => {
+  card.draggable = true; place(card);
+  card.querySelector('select').addEventListener('change', event => { move(card, event.target.value); event.target.focus(); });
+  card.addEventListener('dragstart', event => {
+   if (event.target.closest('select')) { event.preventDefault(); return; }
+   dragged = card; event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', card.dataset.entry); card.classList.add('dragging');
+  });
+  card.addEventListener('dragend', () => { dragged = null; card.classList.remove('dragging'); targets.forEach(target => target.classList.remove('drop-active')); });
+ });
+ document.querySelector('#tray-title').textContent = 'Unscheduled';
+ targets.forEach(target => {
+  target.addEventListener('dragover', event => { if (!dragged) return; event.preventDefault(); event.dataTransfer.dropEffect = 'move'; target.classList.add('drop-active'); });
+  target.addEventListener('dragleave', event => { if (!target.contains(event.relatedTarget)) target.classList.remove('drop-active'); });
+  target.addEventListener('drop', event => { event.preventDefault(); target.classList.remove('drop-active'); if (dragged) move(dragged, target.dataset.day); });
+ });
+ document.querySelectorAll('.poster-art img').forEach(img => {
+  img.addEventListener('error', () => img.remove());
+  if (img.complete && !img.naturalWidth) img.remove();
+ });
+ let submitting = false;
+ form.addEventListener('submit', () => { submitting = true; });
+ window.addEventListener('beforeunload', event => { if (!submitting && initial() !== saved) { event.preventDefault(); event.returnValue = ''; } });
+})();
+</script>
+</body></html>
