@@ -8,7 +8,8 @@
 </head>
 <body>
 <main>
-  <header><p class="eyebrow">Screamtober / Administration</p><h1>Personal token created</h1>{{template "admin_nav"}}</header>
+  {{template "admin_masthead"}}
+  <header id="content"><p class="eyebrow">Screamtober / Administration</p><h1>Personal token created</h1>{{template "admin_nav" "household"}}</header>
   <p>Access is ready for <strong>{{.Name}}</strong>.</p>
   <div class="token-panel">
     <label for="new-token">Personal login token</label>

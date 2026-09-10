@@ -8,14 +8,16 @@
 </head>
 <body>
 <main>
-  <header>
+  {{template "admin_masthead"}}
+  <header id="content">
     <p class="eyebrow">Screamtober / Administration</p>
     <h1>Your household</h1>
     <p>One owner. Three members. A whole month of movies.</p>
-    {{template "admin_nav"}}
+    {{template "admin_nav" "household"}}
   </header>
   {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
-  <section aria-labelledby="create-heading">
+  <div class="household-layout">
+  <section class="panel" aria-labelledby="create-heading">
     <h2 id="create-heading">Add a person</h2>
     {{if not .HasOwner}}<p>Start by creating your own owner profile and personal login token.</p>{{end}}
     <p>Every personal token allows its person to rate movies. Sign out of admin before using a personal token.</p>
@@ -60,6 +62,8 @@
     </ul>
     {{else}}<p>No profiles yet. Create your owner profile above.</p>{{end}}
   </section>
+  </div>
+  {{template "site_footer"}}
 </main>
 </body>
 </html>

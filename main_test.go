@@ -28,7 +28,7 @@ func TestRoutes(t *testing.T) {
 				if got := response.Header().Get("Content-Type"); got != "text/html; charset=utf-8" {
 					t.Errorf("unexpected Content-Type: %q", got)
 				}
-				if !strings.Contains(response.Body.String(), "<h1>Screamtober</h1>") {
+				if !strings.Contains(response.Body.String(), "<h1>31 nights.<br>A little <em>fright.</em></h1>") {
 					t.Error("response does not contain the rendered page heading")
 				}
 			}
