@@ -5,28 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Search movies · Screamtober</title>
   {{template "admin_style"}}
-  <style>
-    .search-row { display: flex; align-items: start; gap: .75rem; margin-top: .3rem; }
-    .search-row input { flex: 1; min-width: 0; margin: 0; }
-    .search-row button { flex-shrink: 0; }
-    fieldset { border: 0; padding: 0; margin: 1rem 0; }
-    .movie-option { display: flex; align-items: center; gap: .8rem; padding: .85rem 0; border-bottom: 1px solid var(--line); margin: 0; cursor: pointer; }
-    .movie-option input { width: auto; margin: 0; accent-color: var(--accent); }
-    .movie-option small { font-weight: normal; color: #63574d; }
-    .pagination { margin-top: 1.5rem; }
-    .credits { margin-top: 2rem; font-size: .85rem; }
-    @media (max-width: 28rem) { .search-row { flex-direction: column; } .search-row button { width: 100%; } }
-  </style>
 </head>
 <body>
 <main>
-  <header>
+  {{template "admin_masthead"}}
+  <header id="content">
     <p class="eyebrow">Screamtober / Administration</p>
     <h1>Search movies</h1>
-    <p>Find a title in The Movie Database.</p>
-    {{template "admin_nav"}}
+    <p>Choose a challenge year, then find a movie to add to its lineup.</p>
+    {{template "admin_nav" "movies"}}
   </header>
-  <form method="get" action="/admin/movies/search" role="search">
+  <form class="panel search-form" method="get" action="/admin/movies/search" role="search">
     <label for="challenge-year">Challenge year</label>
     <input type="number" id="challenge-year" name="year" min="1" max="9999" value="{{.Year}}" required>
     <label for="movie-title">Movie title</label>
@@ -38,7 +27,7 @@
   {{if .Error}}<p class="error" id="search-error" role="alert">{{.Error}}</p>{{end}}
   {{if .Notice}}<p role="status">{{.Notice}}</p>{{end}}
   {{if .Searched}}
-  <section aria-labelledby="results-heading">
+  <section class="search-results" aria-labelledby="results-heading">
     <h2 id="results-heading">Search results</h2>
     {{if .Empty}}<p>No movies found. Try a different title.</p>{{else}}
     <form method="post" action="/admin/movies">
@@ -47,7 +36,7 @@
       <fieldset>
         <legend>Select one movie for {{.Year}}</legend>
         {{range .Results}}
-        <label class="movie-option"><input type="radio" name="movie_id" value="{{.ID}}" required><span>{{.Title}} <small>({{.Year}})</small></span></label>
+        <label class="movie-option"><input type="radio" name="movie_id" value="{{.ID}}" required><span class="result-title">{{.Title}} <small>({{.Year}})</small></span></label>
         {{end}}
       </fieldset>
       <button type="submit">Add to {{.Year}}</button>

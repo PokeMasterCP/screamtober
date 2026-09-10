@@ -1,11 +1,43 @@
 package main
 
 import (
+	"bytes"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 )
+
+func TestBundledFontsAcrossSessions(t *testing.T) {
+	for _, session := range []string{"visitor", "personal", "admin"} {
+		t.Run(session, func(t *testing.T) {
+			_, handler := authFixture(t, testToken, true)
+			var cookie *http.Cookie
+			if session == "personal" {
+				cookie = loginCookie(t, handler)
+			} else if session == "admin" {
+				login := authRequest(handler, "POST", "/login", testAdminToken, nil)
+				cookie = activeSessionCookie(t, login, adminSessionCookie)
+			}
+			for _, name := range []string{"Barlow-Regular.ttf", "Barlow-SemiBold.ttf", "BarlowCondensed-Bold.ttf", "BarlowCondensed-ExtraBold.ttf"} {
+				w := authRequest(handler, "GET", "/assets/fonts/"+name, "", cookie)
+				if w.Code != http.StatusOK || w.Header().Get("Content-Type") != "font/ttf" || !bytes.HasPrefix(w.Body.Bytes(), []byte{0, 1, 0, 0}) {
+					t.Fatalf("font %s: status %d, type %q", name, w.Code, w.Header().Get("Content-Type"))
+				}
+			}
+			license := authRequest(handler, "GET", "/assets/fonts/OFL.txt", "", cookie)
+			if license.Code != http.StatusOK || !strings.Contains(license.Body.String(), "SIL OPEN FONT LICENSE") {
+				t.Fatal("bundled font license is unavailable")
+			}
+			if session == "admin" {
+				w := authRequest(handler, "GET", "/", "", cookie)
+				if w.Code != http.StatusSeeOther || w.Header().Get("Location") != "/admin/users" {
+					t.Fatal("public fonts must not bypass the admin/product session boundary")
+				}
+			}
+		})
+	}
+}
 
 func TestRoutes(t *testing.T) {
 	_, handler := authFixture(t, testToken, false)
@@ -28,7 +60,7 @@ func TestRoutes(t *testing.T) {
 				if got := response.Header().Get("Content-Type"); got != "text/html; charset=utf-8" {
 					t.Errorf("unexpected Content-Type: %q", got)
 				}
-				if !strings.Contains(response.Body.String(), "<h1>Screamtober</h1>") {
+				if !strings.Contains(response.Body.String(), `<h1>31 nights.<br>A little <span class="hero-accent">fright.</span></h1>`) {
 					t.Error("response does not contain the rendered page heading")
 				}
 			}

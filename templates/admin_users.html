@@ -8,14 +8,16 @@
 </head>
 <body>
 <main>
-  <header>
+  {{template "admin_masthead"}}
+  <header id="content">
     <p class="eyebrow">Screamtober / Administration</p>
     <h1>Your household</h1>
     <p>One owner. Three members. A whole month of movies.</p>
-    {{template "admin_nav"}}
+    {{template "admin_nav" "household"}}
   </header>
   {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
-  <section aria-labelledby="create-heading">
+  <div class="household-layout">
+  <section class="panel" aria-labelledby="create-heading">
     <h2 id="create-heading">Add a person</h2>
     {{if not .HasOwner}}<p>Start by creating your own owner profile and personal login token.</p>{{end}}
     <p>Every personal token allows its person to rate movies. Sign out of admin before using a personal token.</p>
@@ -39,18 +41,20 @@
       <li class="profile">
         <h3>{{.DisplayName}}</h3>
         <p>{{if eq .Role "owner"}}Owner{{else}}Member{{end}} · {{if .DisabledAt.Valid}}Access disabled{{else if .HasToken}}Access enabled{{else}}Needs a token{{end}}</p>
+        <details class="profile-edit"><summary>Edit display name</summary>
         <form class="rename" method="post" action="/admin/users/{{.ID}}/rename">
           <label for="name-{{.ID}}">Display name for {{.DisplayName}}</label>
           <input id="name-{{.ID}}" name="display_name" value="{{.DisplayName}}" maxlength="80" required autocomplete="off">
           <button class="secondary" type="submit">Save name</button>
         </form>
+        </details>
         <div class="actions">
           <form method="post" action="/admin/users/{{.ID}}/token">
             <button type="submit">{{if .DisabledAt.Valid}}Create token and re-enable{{else if .HasToken}}Replace login token{{else}}Create login token{{end}}</button>
           </form>
           {{if not .DisabledAt.Valid}}
           <form method="post" action="/admin/users/{{.ID}}/disable">
-            <button class="secondary" type="submit">Disable access</button>
+            <button class="secondary danger" type="submit">Disable access</button>
           </form>
           {{end}}
         </div>
@@ -60,6 +64,8 @@
     </ul>
     {{else}}<p>No profiles yet. Create your owner profile above.</p>{{end}}
   </section>
+  </div>
+  {{template "site_footer"}}
 </main>
 </body>
 </html>
