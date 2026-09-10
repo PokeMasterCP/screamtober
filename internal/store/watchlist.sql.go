@@ -62,6 +62,15 @@ func (q *Queries) AddUnscheduledMovie(ctx context.Context, arg AddUnscheduledMov
 	return i, err
 }
 
+const clearChallengePositions = `-- name: ClearChallengePositions :exec
+UPDATE challenge_movies SET position = NULL WHERE challenge_id = ?
+`
+
+func (q *Queries) ClearChallengePositions(ctx context.Context, challengeID int64) error {
+	_, err := q.db.ExecContext(ctx, clearChallengePositions, challengeID)
+	return err
+}
+
 const countChallengeMovies = `-- name: CountChallengeMovies :one
 SELECT count(*) FROM challenge_movies WHERE challenge_id = ?
 `
@@ -173,4 +182,23 @@ func (q *Queries) SetChallengeMovieWatchedAt(ctx context.Context, arg SetChallen
 		&i.SubmissionKey,
 	)
 	return i, err
+}
+
+const setChallengePosition = `-- name: SetChallengePosition :execrows
+UPDATE challenge_movies SET position = ?1
+WHERE id = ?2 AND challenge_id = ?3
+`
+
+type SetChallengePositionParams struct {
+	Position    sql.NullInt64
+	ID          int64
+	ChallengeID int64
+}
+
+func (q *Queries) SetChallengePosition(ctx context.Context, arg SetChallengePositionParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, setChallengePosition, arg.Position, arg.ID, arg.ChallengeID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }

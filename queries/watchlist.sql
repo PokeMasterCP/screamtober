@@ -28,3 +28,10 @@ SELECT * FROM challenge_movies WHERE submission_key = ?;
 
 -- name: CountChallengeMovies :one
 SELECT count(*) FROM challenge_movies WHERE challenge_id = ?;
+
+-- name: ClearChallengePositions :exec
+UPDATE challenge_movies SET position = NULL WHERE challenge_id = ?;
+
+-- name: SetChallengePosition :execrows
+UPDATE challenge_movies SET position = sqlc.narg(position)
+WHERE id = sqlc.arg(id) AND challenge_id = sqlc.arg(challenge_id);

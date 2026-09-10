@@ -24,6 +24,7 @@
       <button type="submit">Search</button>
     </div>
   </form>
+  <p><a href="/admin/calendar?year={{.Year}}">Arrange the {{.Year}} lineup →</a></p>
   {{if .Error}}<p class="error" id="search-error" role="alert">{{.Error}}</p>{{end}}
   {{if .Notice}}<p role="status">{{.Notice}}</p>{{end}}
   {{if .Searched}}

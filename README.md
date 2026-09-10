@@ -89,6 +89,14 @@ Day assignment and reordering will follow later.
 If your results expire (after ten minutes) or the app restarts, search again.
 Personal sessions and visitors cannot access this admin tool.
 
+Choose **Arrange movies** in the admin panel to schedule a year’s added movies.
+Drag posters from the unscheduled tray onto the 31-day October calendar; dropping
+onto an occupied day swaps the two entries. Return a poster to the tray to
+unschedule it. Day selectors also work with a keyboard or on mobile, and without
+JavaScript (choose a unique day for each movie). Choose **Save arrangement** to
+keep your changes. Ratings and watched status stay with each entry when it moves.
+If another tab changes the lineup, reload and arrange the latest version.
+
 Set `TMDB_API_KEY` in the web server environment and restart the app. In Docker,
 add `-e TMDB_API_KEY` to either deployment command after exporting the variable.
 The web app still starts without the key and serves cached challenge data;
@@ -381,7 +389,7 @@ This is an internal data-access layer, not authorization. Go handlers must requi
 an admin session before administration or watched-status writes and derive the
 rating user ID from the authenticated personal session. Never grant admin access
 based only on the household role stored in `users`.
-Removal and reordering queries will follow with their transactional feature logic.
+Calendar reordering clears and assigns positions in one transaction, retaining entry IDs.
 
 ## Development checks
 
