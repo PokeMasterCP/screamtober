@@ -176,6 +176,7 @@
 <nav class="admin-nav" aria-label="Administration">
   <a href="/admin/users"{{if eq . "household"}} aria-current="page"{{end}}>Household</a>
   <a href="/admin/movies/search"{{if eq . "movies"}} aria-current="page"{{end}}>Search movies</a>
+  <a href="/admin/calendar"{{if eq . "calendar"}} aria-current="page"{{end}}>Arrange movies</a>
   <form method="post" action="/admin/logout"><button class="secondary" type="submit">Sign out of admin</button></form>
 </nav>
 {{end}}
