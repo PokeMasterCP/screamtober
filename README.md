@@ -11,7 +11,11 @@ rating editing forms are still to come. There is no public registration.
 
 ## Challenge pages
 
-- `GET /` shows the latest configured challenge (the highest year), or an empty state.
+- `GET /` shows the current calendar year's watchlist (using the server's local
+  time), or a pending lineup message when no movies have been added. “Up next”
+  highlights the first unwatched entry: scheduled movies in day order, then
+  unscheduled movies in the order added. Once all selected movies are watched,
+  the page shows “You’re all caught up.”
 - `GET /challenges/{year}` shows that year's ordered watchlist, shared watched status,
   individual ratings, and the average of submitted ratings. Unknown or malformed
   years return 404.
