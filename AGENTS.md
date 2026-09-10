@@ -103,14 +103,6 @@ Use structured JSON with request ID, client IP, method, path, status, duration, 
 - Follow existing metadata-storage and caching conventions. Check current TMDB requirements when changing attribution or API usage.
 
 ## Development workflow
-
-Start new feature branches from current `origin/staging`, target feature PRs at
-`staging`, and squash-merge them. Promote `staging` to `main` with a regular
-merge commit, never squash or
-rebase. After promotion, fast-forward staging to main when possible. Do not
-force-push shared branches or delete main/staging. Preserve unfinished work and
-local databases when cleaning up worktrees.
-
 Use your judgment and voice concerns when a proposed choice is unsafe, unnecessarily complex, or likely to cause problems. Explain the concrete tradeoff and suggest a simpler or safer alternative. Do not agree reflexively; continue routine work without unnecessary approval requests.
 
 1. Read the relevant code, repository instructions, configuration, and tests before changing behavior. Use documented commands and pinned tool versions; do not invent repository paths or commands.
