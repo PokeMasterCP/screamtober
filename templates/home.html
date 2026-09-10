@@ -25,7 +25,8 @@
         {{if .Movies}}
         <ol>
           {{range .Movies}}
-          <li value="{{.Position}}">
+          <li{{if .Position.Valid}} value="{{.Position.Int64}}"{{else}} style="list-style: none"{{end}}>
+            {{if not .Position.Valid}}<span>Unscheduled · </span>{{end}}
             <article>
               <h3>{{.Title}}</h3>
               {{if .ReleaseDate.Valid}}<p>Released {{.ReleaseDate.String}}</p>{{end}}

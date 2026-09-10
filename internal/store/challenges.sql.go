@@ -20,6 +20,19 @@ func (q *Queries) CreateChallenge(ctx context.Context, year int64) (Challenge, e
 	return i, err
 }
 
+const ensureChallenge = `-- name: EnsureChallenge :one
+INSERT INTO challenges (year) VALUES (?)
+ON CONFLICT (year) DO UPDATE SET year = excluded.year
+RETURNING id, year
+`
+
+func (q *Queries) EnsureChallenge(ctx context.Context, year int64) (Challenge, error) {
+	row := q.db.QueryRowContext(ctx, ensureChallenge, year)
+	var i Challenge
+	err := row.Scan(&i.ID, &i.Year)
+	return i, err
+}
+
 const getChallengeByYear = `-- name: GetChallengeByYear :one
 SELECT id, year FROM challenges WHERE year = ?
 `

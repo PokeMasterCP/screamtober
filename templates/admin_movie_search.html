@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Search movies · Screamtober</title>
+  {{template "admin_style"}}
+  <style>
+    .search-row { display: flex; align-items: start; gap: .75rem; margin-top: .3rem; }
+    .search-row input { flex: 1; min-width: 0; margin: 0; }
+    .search-row button { flex-shrink: 0; }
+    fieldset { border: 0; padding: 0; margin: 1rem 0; }
+    .movie-option { display: flex; align-items: center; gap: .8rem; padding: .85rem 0; border-bottom: 1px solid var(--line); margin: 0; cursor: pointer; }
+    .movie-option input { width: auto; margin: 0; accent-color: var(--accent); }
+    .movie-option small { font-weight: normal; color: #63574d; }
+    .pagination { margin-top: 1.5rem; }
+    .credits { margin-top: 2rem; font-size: .85rem; }
+    @media (max-width: 28rem) { .search-row { flex-direction: column; } .search-row button { width: 100%; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <p class="eyebrow">Screamtober / Administration</p>
+    <h1>Search movies</h1>
+    <p>Find a title in The Movie Database.</p>
+    {{template "admin_nav"}}
+  </header>
+  <form method="get" action="/admin/movies/search" role="search">
+    <label for="challenge-year">Challenge year</label>
+    <input type="number" id="challenge-year" name="year" min="1" max="9999" value="{{.Year}}" required>
+    <label for="movie-title">Movie title</label>
+    <div class="search-row">
+      <input type="search" id="movie-title" name="q" value="{{.Query}}" maxlength="200" required placeholder="e.g. Halloween"{{if .Error}} aria-describedby="search-error"{{end}}>
+      <button type="submit">Search</button>
+    </div>
+  </form>
+  {{if .Error}}<p class="error" id="search-error" role="alert">{{.Error}}</p>{{end}}
+  {{if .Notice}}<p role="status">{{.Notice}}</p>{{end}}
+  {{if .Searched}}
+  <section aria-labelledby="results-heading">
+    <h2 id="results-heading">Search results</h2>
+    {{if .Empty}}<p>No movies found. Try a different title.</p>{{else}}
+    <form method="post" action="/admin/movies">
+      <input type="hidden" name="year" value="{{.Year}}">
+      <input type="hidden" name="search_reference" value="{{.Reference}}">
+      <fieldset>
+        <legend>Select one movie for {{.Year}}</legend>
+        {{range .Results}}
+        <label class="movie-option"><input type="radio" name="movie_id" value="{{.ID}}" required><span>{{.Title}} <small>({{.Year}})</small></span></label>
+        {{end}}
+      </fieldset>
+      <button type="submit">Add to {{.Year}}</button>
+    </form>
+    {{end}}
+    <nav class="pagination" aria-label="Search results pages">
+      {{if .Previous}}<a href="{{.Previous}}">Previous</a>{{end}}
+      <span>Page {{.Page}}</span>
+      {{if .Next}}<a href="{{.Next}}">Next</a>{{end}}
+    </nav>
+  </section>
+  {{end}}
+  <footer class="credits" aria-label="Credits">
+    <a href="https://www.themoviedb.org"><img src="https://www.themoviedb.org/assets/v4/logos/v2/blue_short-8e7b30f73a4020692ccca9c88bafe5dcb6f8a62a4c6bc55cd9ba82bb2cd95f6c.svg" alt="TMDB" width="100" height="44" loading="lazy"></a>
+    <p>Movie data provided by <a href="https://www.themoviedb.org">TMDB</a>.</p>
+    <p>This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
+  </footer>
+</main>
+</body>
+</html>

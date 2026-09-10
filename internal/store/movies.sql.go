@@ -10,6 +10,34 @@ import (
 	"database/sql"
 )
 
+const addMovieToCatalog = `-- name: AddMovieToCatalog :execrows
+INSERT INTO movies (tmdb_id, title, release_date, poster_path, overview)
+VALUES (?, ?, ?, ?, ?)
+ON CONFLICT (tmdb_id) DO NOTHING
+`
+
+type AddMovieToCatalogParams struct {
+	TmdbID      int64
+	Title       string
+	ReleaseDate sql.NullString
+	PosterPath  sql.NullString
+	Overview    sql.NullString
+}
+
+func (q *Queries) AddMovieToCatalog(ctx context.Context, arg AddMovieToCatalogParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, addMovieToCatalog,
+		arg.TmdbID,
+		arg.Title,
+		arg.ReleaseDate,
+		arg.PosterPath,
+		arg.Overview,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const getMovieByTMDBID = `-- name: GetMovieByTMDBID :one
 SELECT id, tmdb_id, title, release_date, poster_path, overview, created_at FROM movies WHERE tmdb_id = ?
 `

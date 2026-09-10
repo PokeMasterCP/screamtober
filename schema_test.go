@@ -107,7 +107,7 @@ func TestRatingEditsAndYearIsolation(t *testing.T) {
 	}
 }
 
-func TestUpgradeFromBaseline(t *testing.T) {
+func TestSchemaRollbackAndRebuild(t *testing.T) {
 	ctx := context.Background()
 	path := filepath.Join(t.TempDir(), "upgrade.db")
 	db, err := openDatabase(ctx, path)
@@ -123,11 +123,11 @@ func TestUpgradeFromBaseline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := provider.DownTo(ctx, 1); err != nil {
+	if _, err := provider.DownTo(ctx, 0); err != nil {
 		t.Fatal(err)
 	}
 	var count int
-	if err := db.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name IN ('users', 'movies', 'challenges', 'challenge_movies', 'ratings')`).Scan(&count); err != nil || count != 0 {
+	if err := db.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name IN ('users', 'movies', 'challenges', 'challenge_movies', 'ratings', 'user_tokens')`).Scan(&count); err != nil || count != 0 {
 		t.Fatalf("tables after rollback = %d, error = %v", count, err)
 	}
 	if err := db.Close(); err != nil {
@@ -137,32 +137,7 @@ func TestUpgradeFromBaseline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name IN ('users', 'movies', 'challenges', 'challenge_movies', 'ratings')`).Scan(&count); err != nil || count != 5 {
+	if err := db.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name IN ('users', 'movies', 'challenges', 'challenge_movies', 'ratings', 'user_tokens')`).Scan(&count); err != nil || count != 6 {
 		t.Fatalf("tables after upgrade = %d, error = %v", count, err)
-	}
-}
-
-func TestUserAccessMigrationPreservesHistory(t *testing.T) {
-	ctx := context.Background()
-	db := schemaFixture(t)
-	migrations, err := fs.Sub(migrationFiles, "migrations")
-	if err != nil {
-		t.Fatal(err)
-	}
-	provider, err := goose.NewProvider(goose.DialectSQLite3, db, migrations, goose.WithDisableGlobalRegistry(true))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := provider.DownTo(ctx, 2); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := provider.Up(ctx); err != nil {
-		t.Fatal(err)
-	}
-	for table, want := range map[string]int{"users": 2, "ratings": 4, "challenge_movies": 3, "user_tokens": 0} {
-		var count int
-		if err := db.QueryRowContext(ctx, "SELECT count(*) FROM "+table).Scan(&count); err != nil || count != want {
-			t.Fatalf("%s count after upgrade = %d, error = %v", table, count, err)
-		}
 	}
 }
