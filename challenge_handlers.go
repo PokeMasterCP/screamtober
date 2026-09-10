@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/pokemastercp/screamtober/internal/store"
 )
@@ -24,6 +25,8 @@ type challengePage struct {
 	SignedIn   bool
 	Challenges []store.Challenge
 	Challenge  *store.Challenge
+	Year       int64
+	NextMovie  *challengeMovieView
 	Movies     []challengeMovieView
 	Watched    int
 	User       *store.User
@@ -43,8 +46,11 @@ func (h *challengeHandler) home(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var selected *store.Challenge
-	if len(challenges) > 0 {
-		selected = &challenges[0]
+	for i := range challenges {
+		if challenges[i].Year == int64(time.Now().Year()) {
+			selected = &challenges[i]
+			break
+		}
 	}
 	h.render(w, r, challenges, selected)
 }
@@ -81,7 +87,9 @@ func (h *challengeHandler) render(w http.ResponseWriter, r *http.Request, challe
 		return
 	}
 	data := challengePage{Title: "Screamtober", SignedIn: user != nil, User: user, Challenges: challenges, Challenge: selected}
+	data.Year = int64(time.Now().Year())
 	if selected != nil {
+		data.Year = selected.Year
 		movies, err := h.queries.ListChallengeMovies(r.Context(), selected.ID)
 		if err != nil {
 			h.fail(w, r, "list challenge movies", err)
@@ -109,6 +117,9 @@ func (h *challengeHandler) render(w http.ResponseWriter, r *http.Request, challe
 				entry.Average = fmt.Sprintf("%.1f", float64(total)/float64(len(entry.Ratings)))
 			}
 			data.Movies = append(data.Movies, entry)
+			if !movie.WatchedAt.Valid && data.NextMovie == nil {
+				data.NextMovie = &entry
+			}
 		}
 	}
 	var body bytes.Buffer
