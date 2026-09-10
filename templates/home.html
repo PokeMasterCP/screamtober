@@ -1,64 +1,67 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{if .Challenge}}{{.Challenge.Year}} · {{end}}{{.Title}}{{if .SignedIn}} · Signed in{{end}}</title>
-  </head>
-  <body>
-    <main>
-      <h1>{{.Title}}</h1>
-      <p>A home for your October movie watchlist, viewing progress, and ratings.</p>
-      {{if .Challenges}}
-      <nav aria-label="Challenge years">
-        <ul>
-          {{range .Challenges}}
-          <li><a href="/challenges/{{.Year}}"{{if eq .ID $.Challenge.ID}} aria-current="page"{{end}}>{{.Year}}</a></li>
-          {{end}}
-        </ul>
-      </nav>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{if .Challenge}}{{.Challenge.Year}} · {{end}}{{.Title}}{{if .SignedIn}} · Signed in{{end}}</title>
+  {{template "admin_style"}}
+</head>
+<body>
+<a class="skip-link" href="#content">Skip to content</a>
+<main>
+  <div class="masthead">
+    <a class="brand" href="/">Screamtober</a>
+    <nav aria-label="Account">
+      {{if .SignedIn}}<span class="muted">{{.User.DisplayName}}</span><form method="post" action="/logout"><button class="secondary" type="submit">Sign out</button></form>
+      {{else}}<a class="button secondary" href="/login">Sign in</a>{{end}}
+    </nav>
+  </div>
+  <div class="hero" id="content">
+    <div>
+      <p class="eyebrow">The October movie challenge</p>
+      <h1>31 nights.<br>A little <span class="hero-accent">fright.</span></h1>
+      <p class="hero-copy">A month of old favorites, new nightmares, and one very good reason to stay in. Welcome to our October watchlist.</p>
+      {{if .Challenge}}<a class="button secondary" href="#challenge-heading">View the lineup <span aria-hidden="true">↓</span></a>{{end}}
+    </div>
+    <div class="ticket" aria-hidden="true"><span class="ticket-top">OCTOBER · 01—31</span><span class="ticket-number">31</span><span class="section-label">Nights of fright<br>Admit the whole household</span></div>
+  </div>
+  {{if .Challenges}}
+  <nav class="year-nav" aria-label="Challenge years">
+    <span class="section-label muted">Challenge year</span>
+    <ul>{{range .Challenges}}<li><a href="/challenges/{{.Year}}"{{if eq .ID $.Challenge.ID}} aria-current="page"{{end}}>{{.Year}}</a></li>{{end}}</ul>
+  </nav>
+  {{end}}
+  {{if .Challenge}}
+  <section aria-labelledby="challenge-heading">
+    <div class="challenge-heading">
+      <div><p class="eyebrow">The lineup</p><h2 id="challenge-heading">{{.Challenge.Year}} movie challenge</h2><p>{{len .Movies}} of 31 movies selected · {{.Watched}} watched</p></div>
+      <div class="progress-block"><label for="challenge-progress">{{.Watched}} / 31 watched</label><progress id="challenge-progress" value="{{.Watched}}" max="31">{{.Watched}} of 31 watched</progress></div>
+    </div>
+    {{if .Movies}}
+    <ol class="watchlist" role="list">
+      {{range .Movies}}
+      <li{{if .Position.Valid}} value="{{.Position.Int64}}"{{end}}>
+        <article class="movie-card{{if .WatchedAt.Valid}} is-watched{{end}}">
+          <div class="movie-meta"><span class="slot">{{if .Position.Valid}}October {{printf "%02d" .Position.Int64}}{{else}}Unscheduled{{end}}</span><span class="badge{{if .WatchedAt.Valid}} watched{{end}}">{{if .WatchedAt.Valid}}<span aria-hidden="true">✓ </span>Watched{{else}}Not watched yet{{end}}</span></div>
+          <h3>{{.Title}}</h3>
+          {{if .ReleaseDate.Valid}}<p class="release">Released {{.ReleaseDate.String}}</p>{{end}}
+          {{if .Overview.Valid}}<details class="synopsis"><summary>Read synopsis</summary><p class="overview">{{.Overview.String}}</p></details>{{end}}
+          {{if .Ratings}}
+          <p class="rating">Household rating: {{.Average}} / 5 ({{len .Ratings}} {{if eq (len .Ratings) 1}}rating{{else}}ratings{{end}})</p>
+          <ul class="ratings" aria-label="Individual ratings">{{range .Ratings}}<li><span>{{.DisplayName}}: {{.Score}} / 5</span><span class="stars" aria-hidden="true">{{if ge .Score 1}}★{{else}}☆{{end}}{{if ge .Score 2}}★{{else}}☆{{end}}{{if ge .Score 3}}★{{else}}☆{{end}}{{if ge .Score 4}}★{{else}}☆{{end}}{{if ge .Score 5}}★{{else}}☆{{end}}</span></li>{{end}}</ul>
+          {{else}}<p class="rating muted">No ratings yet.</p>{{end}}
+        </article>
+      </li>
       {{end}}
-      {{if .Challenge}}
-      <section aria-labelledby="challenge-heading">
-        <h2 id="challenge-heading">{{.Challenge.Year}} movie challenge</h2>
-        <p>{{len .Movies}} of 31 movies selected · {{.Watched}} watched</p>
-        {{if .Movies}}
-        <ol>
-          {{range .Movies}}
-          <li value="{{.Position}}">
-            <article>
-              <h3>{{.Title}}</h3>
-              {{if .ReleaseDate.Valid}}<p>Released {{.ReleaseDate.String}}</p>{{end}}
-              {{if .Overview.Valid}}<p>{{.Overview.String}}</p>{{end}}
-              <p>{{if .WatchedAt.Valid}}Watched{{else}}Not watched yet{{end}}</p>
-              {{if .Ratings}}
-              <p>Household rating: {{.Average}} / 5 ({{len .Ratings}} {{if eq (len .Ratings) 1}}rating{{else}}ratings{{end}})</p>
-              <ul aria-label="Individual ratings">
-                {{range .Ratings}}<li>{{.DisplayName}}: {{.Score}} / 5</li>{{end}}
-              </ul>
-              {{else}}
-              <p>No ratings yet.</p>
-              {{end}}
-            </article>
-          </li>
-          {{end}}
-        </ol>
-        {{else}}
-        <p>No movies selected for this year yet.</p>
-        {{end}}
-      </section>
-      {{else}}
-      <p>No challenges yet. Check back when the household watchlist is ready.</p>
-      {{end}}
-      {{if .SignedIn}}
-      <h2>Signed in</h2>
-      <p>{{.User.DisplayName}}</p>
-      <form method="post" action="/logout">
-        <button type="submit">Sign out</button>
-      </form>
-      {{else}}
-      <p><a href="/login">Sign in</a></p>
-      {{end}}
-    </main>
-  </body>
+    </ol>
+    {{else}}
+    <div class="empty-state"><h2>The suspense is building.</h2><p>No movies selected for this year yet.</p><p>Our next October lineup is waiting in the wings.</p></div>
+    {{end}}
+  </section>
+  {{else}}
+  <section class="empty-state" aria-labelledby="empty-heading"><p class="eyebrow">Coming soon</p><h2 id="empty-heading">The suspense is building.</h2><p>No challenges yet. Check back when the household watchlist is ready.</p></section>
+  {{end}}
+  {{template "site_footer"}}
+</main>
+</body>
 </html>

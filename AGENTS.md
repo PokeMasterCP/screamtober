@@ -88,7 +88,8 @@ Use structured JSON with request ID, client IP, method, path, status, duration, 
 
 ### Database changes
 
-- Make schema changes through Goose migrations. Do not change production schemas manually or rewrite migrations that may already have been applied.
+- The project is currently pre-production: only disposable test and staging databases exist, and no data needs to survive schema revisions. Existing Goose migrations may be edited or consolidated; recreate those databases instead of adding compatibility migrations solely to preserve test data. Do not add automatic database deletion at application startup.
+- Once production deployment or data-retention requirements begin, stop rewriting applied migrations and use new Goose migrations that preserve existing data. Never change production schemas manually.
 - Edit SQL source queries and regenerate `sqlc` output when needed. Do not hand-edit generated database access code.
 - Use parameterized queries and transactions for changes that must succeed or fail together.
 - Preserve existing challenge history and ratings during migrations. Call out destructive changes and their data consequences before implementation.
@@ -111,6 +112,15 @@ Use your judgment and voice concerns when a proposed choice is unsafe, unnecessa
 4. Keep the user involved in decisions that materially change architecture, dependencies, project structure, or data flow. Continue routine implementation within the agreed scope without repeatedly asking for confirmation.
 5. Preserve unrelated work already present in the repository. Do not overwrite or revert it to simplify the task.
 6. Update relevant documentation when changing behavior, configuration, setup, or deployment requirements.
+
+## Documentation audience
+
+- `README.md` is for self-hosters and people using Screamtober. Focus on what the product does, how to deploy and configure it, and how to use it.
+- Update the README when a change affects those tasks; do not turn it into a feature-by-feature implementation reference or development changelog.
+- Include operational details that help self-hosters run the app reliably, such as required environment variables, persistent storage, backups, upgrades, and actionable troubleshooting.
+- Keep implementation details in relevant developer documentation or code comments. Internal package APIs, database query mechanics, test coverage, and exhaustive log fields or outcome values generally do not belong in the README.
+- Describe logging only to the extent useful for operation: where to find logs, how to set verbosity, and any meaningful privacy considerations. Explain internal logging conventions in developer documentation instead.
+- Prefer concise, task-oriented instructions and examples over explanations of how every feature works internally.
 
 ## Validation and completion
 

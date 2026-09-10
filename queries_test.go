@@ -26,7 +26,7 @@ func TestWatchlistQueries(t *testing.T) {
 	if err != nil || cached.ID != newMovie.ID || cached.Overview.String != "Overview" {
 		t.Fatalf("cached movie = %+v, error = %v", cached, err)
 	}
-	entry, err := q.AddChallengeMovie(ctx, store.AddChallengeMovieParams{ChallengeID: 1, MovieID: newMovie.ID, Position: 3})
+	entry, err := q.AddChallengeMovie(ctx, store.AddChallengeMovieParams{ChallengeID: 1, MovieID: newMovie.ID, Position: sql.NullInt64{Int64: 3, Valid: true}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,7 +36,7 @@ func TestWatchlistQueries(t *testing.T) {
 			t.Fatalf("challenge %d rows = %+v, error = %v", tt.challengeID, rows, err)
 		}
 		for i, row := range rows {
-			if row.ChallengeID != tt.challengeID || row.Position != int64(i+1) {
+			if row.ChallengeID != tt.challengeID || row.Position.Int64 != int64(i+1) {
 				t.Fatalf("incorrect challenge or ordering: %+v", rows)
 			}
 			if row.MovieID == 1 && row.Title != "Updated title" {
@@ -162,7 +162,7 @@ func TestQueriesTransactionRollback(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := transactionQueries.AddChallengeMovie(ctx, store.AddChallengeMovieParams{ChallengeID: challenge.ID, MovieID: 999, Position: 1}); err == nil {
+	if _, err := transactionQueries.AddChallengeMovie(ctx, store.AddChallengeMovieParams{ChallengeID: challenge.ID, MovieID: 999, Position: sql.NullInt64{Int64: 1, Valid: true}}); err == nil {
 		t.Fatal("expected foreign key violation")
 	}
 	if err := tx.Rollback(); err != nil {

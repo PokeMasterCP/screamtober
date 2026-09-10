@@ -172,7 +172,7 @@ func TestAuthLifecycle(t *testing.T) {
 		t.Fatal("session did not grant access")
 	}
 	w = authRequest(h, "GET", "/", "", cookie)
-	if !strings.Contains(w.Body.String(), "<h2>Signed in</h2>") || !strings.Contains(w.Body.String(), `action="/logout"`) {
+	if !strings.Contains(w.Body.String(), ">Sign out</button>") || !strings.Contains(w.Body.String(), `action="/logout"`) {
 		t.Fatal("signed-in UI missing")
 	}
 	if !strings.Contains(w.Body.String(), "<title>Screamtober · Signed in</title>") {
@@ -271,6 +271,9 @@ func TestSuccessfulLoginConfirmation(t *testing.T) {
 			}
 			if !strings.Contains(w.Body.String(), tt.link) || !strings.Contains(w.Body.String(), "Signed in") {
 				t.Fatalf("missing confirmation/navigation: %s", w.Body.String())
+			}
+			if hasMovieSearch := strings.Contains(w.Body.String(), `href="/admin/movies/search"`); hasMovieSearch != (tt.name == "admin") {
+				t.Fatal("admin task navigation must appear only for administrator sign-in")
 			}
 			if w.Header().Get("Cache-Control") != "no-store" || !strings.Contains(w.Header().Get("Content-Type"), "text/html") {
 				t.Fatalf("unexpected headers: %v", w.Header())
