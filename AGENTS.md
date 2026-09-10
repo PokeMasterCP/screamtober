@@ -103,6 +103,10 @@ Use structured JSON with request ID, client IP, method, path, status, duration, 
 - Follow existing metadata-storage and caching conventions. Check current TMDB requirements when changing attribution or API usage.
 
 ## Development workflow
+Create feature branches from up-to-date `main` and open PRs directly into `main`.
+CI checks PRs and pushes to `main`; test changes in the temporary PR environment
+before merging. There is no staging-branch promotion step.
+
 Use your judgment and voice concerns when a proposed choice is unsafe, unnecessarily complex, or likely to cause problems. Explain the concrete tradeoff and suggest a simpler or safer alternative. Do not agree reflexively; continue routine work without unnecessary approval requests.
 
 1. Read the relevant code, repository instructions, configuration, and tests before changing behavior. Use documented commands and pinned tool versions; do not invent repository paths or commands.
