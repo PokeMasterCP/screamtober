@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 )
 
 func challengeHTTPFixture(t *testing.T, db *sql.DB) http.Handler {
@@ -34,7 +36,7 @@ func TestChallengePages(t *testing.T) {
 		status   int
 		contains []string
 	}{
-		{"/", 200, []string{"2027 movie challenge", "1 of 31 movies selected · 0 watched", "Household rating: 3.0 / 5 (1 rating)"}},
+		{"/challenges/2027", 200, []string{"2027 movie challenge", "1 of 31 movies selected · 0 watched", "Household rating: 3.0 / 5 (1 rating)"}},
 		{"/challenges/2026", 200, []string{"2026 movie challenge", "2 of 31 movies selected · 1 watched", "Household rating: 3.0 / 5 (2 ratings)", "Household rating: 2.0 / 5 (1 rating)", "Owner: 1 / 5", "Member: 5 / 5"}},
 		{"/challenges/2025", 404, nil},
 		{"/challenges/nonsense", 404, nil},
@@ -61,7 +63,7 @@ func TestChallengePages(t *testing.T) {
 	// A request sees current database values, without requiring a server restart.
 	execSchema(t, db, `UPDATE ratings SET score = 5 WHERE challenge_movie_id = 3`)
 	w := httptest.NewRecorder()
-	h.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/", nil))
+	h.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/challenges/2027", nil))
 	if !strings.Contains(w.Body.String(), "Household rating: 5.0 / 5") || strings.Contains(w.Body.String(), "Owner: 1 / 5") {
 		t.Fatal("page has stale data or includes ratings from another year")
 	}
@@ -71,7 +73,7 @@ func TestChallengeEmptyStates(t *testing.T) {
 	_, empty := authFixture(t, testToken, true)
 	w := httptest.NewRecorder()
 	empty.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/", nil))
-	if w.Code != 200 || !strings.Contains(w.Body.String(), "No challenges yet.") {
+	if w.Code != 200 || !strings.Contains(w.Body.String(), "The lineup is still in the making.") {
 		t.Fatalf("empty home = %d %s", w.Code, w.Body.String())
 	}
 	db := schemaFixture(t)
@@ -146,7 +148,7 @@ func TestChallengeDatabaseFailureLogging(t *testing.T) {
 				t.Fatal(err)
 			}
 			w := httptest.NewRecorder()
-			requestLogging(logger, h).ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/", nil))
+			requestLogging(logger, h).ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/challenges/2026", nil))
 			if w.Code != 500 || w.Body.String() != "Unable to load challenge. Please try again later.\n" {
 				t.Fatalf("error response = %d %s", w.Code, w.Body.String())
 			}
@@ -156,6 +158,66 @@ func TestChallengeDatabaseFailureLogging(t *testing.T) {
 			}
 			if event["message"] != "load challenge failed" || event["level"] != "error" || event["error"] == nil || event["request_id"] == nil {
 				t.Fatalf("missing failure details: %v", event)
+			}
+		})
+	}
+}
+
+func TestHomeCurrentYearAndNextMovie(t *testing.T) {
+	for _, scenario := range []struct {
+		name, setup, want, absent string
+	}{
+		{"missing year", "", "The lineup is still in the making.", "Up next"},
+		{"empty year", "INSERT INTO challenges (id, year) VALUES (3, ?)", "The lineup is still in the making.", "Up next"},
+		{"scheduled before unscheduled", "", `href="#movie-5"`, "You’re all caught up."},
+		{"skip watched", "UPDATE challenge_movies SET watched_at = CURRENT_TIMESTAMP WHERE id = 5", `href="#movie-6"`, "You’re all caught up."},
+		{"unscheduled next", "UPDATE challenge_movies SET watched_at = CURRENT_TIMESTAMP WHERE id IN (5,6)", `href="#movie-4"`, "You’re all caught up."},
+		{"all watched", "UPDATE challenge_movies SET watched_at = CURRENT_TIMESTAMP WHERE challenge_id = 3", "You’re all caught up.", "Up next"},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			db := schemaFixture(t)
+			year := time.Now().Year()
+			execSchema(t, db, "UPDATE challenges SET year = year + 100")
+			execSchema(t, db, "UPDATE challenges SET year = ? WHERE id = 1", year-1)
+			execSchema(t, db, "UPDATE challenges SET year = ? WHERE id = 2", year+1)
+			if scenario.name == "empty year" {
+				execSchema(t, db, scenario.setup, year)
+			} else if scenario.name != "missing year" {
+				execSchema(t, db, "INSERT INTO challenges (id, year) VALUES (3, ?)", year)
+				execSchema(t, db, `INSERT INTO movies (id, tmdb_id, title, overview) VALUES (2, 456, '<b>Current movie</b>', '<em>Current overview</em>');
+INSERT INTO challenge_movies (id, challenge_id, movie_id, position) VALUES (4,3,2,NULL), (5,3,2,2), (6,3,2,7)`)
+				if scenario.setup != "" {
+					execSchema(t, db, scenario.setup)
+				}
+			}
+			h := challengeHTTPFixture(t, db)
+			for _, signedIn := range []bool{false, true} {
+				var cookie *http.Cookie
+				if signedIn {
+					cookie = loginCookie(t, h)
+				}
+				w := authRequest(h, "GET", "/", "", cookie)
+				body := w.Body.String()
+				for _, want := range []string{fmt.Sprintf("%d movie challenge", year), scenario.want, fmt.Sprintf(`href="/challenges/%d"`, year-1), fmt.Sprintf(`href="/challenges/%d"`, year+1)} {
+					if w.Code != 200 || !strings.Contains(body, want) {
+						t.Fatalf("home missing %q: %d %s", want, w.Code, body)
+					}
+				}
+				for _, absent := range []string{scenario.absent, "Test movie", "<b>Current movie</b>", "<em>Current overview</em>"} {
+					if strings.Contains(body, absent) {
+						t.Fatalf("home unexpectedly contains %q", absent)
+					}
+				}
+				if strings.Contains(scenario.want, "#movie-") && !strings.Contains(body, "&lt;b&gt;Current movie&lt;/b&gt;") {
+					t.Fatal("missing escaped next movie")
+				}
+			}
+			var count int
+			if err := db.QueryRow("SELECT count(*) FROM challenges").Scan(&count); err != nil {
+				t.Fatal(err)
+			}
+			if scenario.name == "missing year" && count != 2 {
+				t.Fatal("home created a challenge")
 			}
 		})
 	}

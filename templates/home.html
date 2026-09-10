@@ -28,7 +28,7 @@
   {{if .Challenges}}
   <nav class="year-nav" aria-label="Challenge years">
     <span class="section-label muted">Challenge year</span>
-    <ul>{{range .Challenges}}<li><a href="/challenges/{{.Year}}"{{if eq .ID $.Challenge.ID}} aria-current="page"{{end}}>{{.Year}}</a></li>{{end}}</ul>
+    <ul>{{range .Challenges}}<li><a href="/challenges/{{.Year}}"{{if eq .Year $.Year}} aria-current="page"{{end}}>{{.Year}}</a></li>{{end}}</ul>
   </nav>
   {{end}}
   {{if .Challenge}}
@@ -38,10 +38,22 @@
       <div class="progress-block"><label for="challenge-progress">{{.Watched}} / 31 watched</label><progress id="challenge-progress" value="{{.Watched}}" max="31">{{.Watched}} of 31 watched</progress></div>
     </div>
     {{if .Movies}}
+    <section class="next-movie" aria-labelledby="next-movie-heading">
+      {{with .NextMovie}}
+      <p class="eyebrow">Up next{{if .Position.Valid}} · October {{printf "%02d" .Position.Int64}}{{else}} · Unscheduled{{end}}</p>
+      <h2 id="next-movie-heading">{{.Title}}</h2>
+      {{if .Overview.Valid}}<p class="overview">{{.Overview.String}}</p>{{end}}
+      <a class="button secondary" href="#movie-{{.ID}}">View movie details <span aria-hidden="true">↓</span></a>
+      {{else}}
+      <p class="eyebrow">All selected movies watched</p>
+      <h2 id="next-movie-heading">You’re all caught up.</h2>
+      <p>Every movie on this year’s list has been watched.</p>
+      {{end}}
+    </section>
     <ol class="watchlist" role="list">
       {{range .Movies}}
       <li{{if .Position.Valid}} value="{{.Position.Int64}}"{{end}}>
-        <article class="movie-card{{if .WatchedAt.Valid}} is-watched{{end}}">
+        <article id="movie-{{.ID}}" class="movie-card{{if .WatchedAt.Valid}} is-watched{{end}}">
           <div class="movie-meta"><span class="slot">{{if .Position.Valid}}October {{printf "%02d" .Position.Int64}}{{else}}Unscheduled{{end}}</span><span class="badge{{if .WatchedAt.Valid}} watched{{end}}">{{if .WatchedAt.Valid}}<span aria-hidden="true">✓ </span>Watched{{else}}Not watched yet{{end}}</span></div>
           <h3>{{.Title}}</h3>
           {{if .ReleaseDate.Valid}}<p class="release">Released {{.ReleaseDate.String}}</p>{{end}}
@@ -55,11 +67,11 @@
       {{end}}
     </ol>
     {{else}}
-    <div class="empty-state"><h2>The suspense is building.</h2><p>No movies selected for this year yet.</p><p>Our next October lineup is waiting in the wings.</p></div>
+    <div class="empty-state"><h2>The lineup is still in the making.</h2><p>No movies selected for this year yet.</p><p>Check back for our October picks.</p></div>
     {{end}}
   </section>
   {{else}}
-  <section class="empty-state" aria-labelledby="empty-heading"><p class="eyebrow">Coming soon</p><h2 id="empty-heading">The suspense is building.</h2><p>No challenges yet. Check back when the household watchlist is ready.</p></section>
+  <section class="empty-state" aria-labelledby="empty-heading"><p class="eyebrow">{{.Year}} movie challenge</p><h2 id="empty-heading">The lineup is still in the making.</h2><p>No movies selected for this year yet.</p><p>Check back for our October picks.</p></section>
   {{end}}
   {{template "site_footer"}}
 </main>
