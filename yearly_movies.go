@@ -1,0 +1,56 @@
+package main
+
+import (
+	"context"
+	"crypto/sha256"
+	"database/sql"
+	"errors"
+	"fmt"
+
+	"github.com/pokemastercp/screamtober/internal/store"
+	"github.com/pokemastercp/screamtober/internal/tmdb"
+)
+
+var errYearFull = errors.New("year already has 31 movies")
+
+// Save the catalog metadata and yearly pick together. A retry of the same
+// selection is idempotent; a new search can intentionally add another appearance.
+func addYearlyMovie(ctx context.Context, db *sql.DB, movie tmdb.MovieSummary, year int, reference string) (bool, error) {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback()
+	q := store.New(tx)
+	digest := sha256.Sum256([]byte(fmt.Sprintf("%s:%d:%d", reference, year, movie.ID)))
+	key := sql.NullString{String: fmt.Sprintf("%x", digest), Valid: true}
+	if _, err := q.GetEntryBySubmission(ctx, key); err == nil {
+		return true, nil
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return false, err
+	}
+	challenge, err := q.EnsureChallenge(ctx, int64(year))
+	if err != nil {
+		return false, err
+	}
+	count, err := q.CountChallengeMovies(ctx, challenge.ID)
+	if err != nil {
+		return false, err
+	}
+	if count >= 31 {
+		return false, errYearFull
+	}
+	_, err = q.AddMovieToCatalog(ctx, store.AddMovieToCatalogParams{TmdbID: movie.ID, Title: movie.Title, ReleaseDate: nullableMovieText(movie.ReleaseDate), PosterPath: nullableMovieText(movie.PosterPath), Overview: nullableMovieText(movie.Overview)})
+	if err != nil {
+		return false, err
+	}
+	cached, err := q.GetMovieByTMDBID(ctx, movie.ID)
+	if err != nil {
+		return false, err
+	}
+	_, err = q.AddUnscheduledMovie(ctx, store.AddUnscheduledMovieParams{ChallengeID: challenge.ID, MovieID: cached.ID, SubmissionKey: key})
+	if err != nil {
+		return false, err
+	}
+	return false, tx.Commit()
+}

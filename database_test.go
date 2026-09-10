@@ -53,7 +53,7 @@ func TestDatabasePersistenceAndMigrations(t *testing.T) {
 		t.Fatalf("persisted value = %q, error = %v", value, err)
 	}
 	var version int
-	if err := db.QueryRowContext(ctx, "SELECT MAX(version_id) FROM goose_db_version WHERE is_applied = 1").Scan(&version); err != nil || version != 3 {
+	if err := db.QueryRowContext(ctx, "SELECT MAX(version_id) FROM goose_db_version WHERE is_applied = 1").Scan(&version); err != nil || version != 1 {
 		t.Fatalf("migration version = %d, error = %v", version, err)
 	}
 }

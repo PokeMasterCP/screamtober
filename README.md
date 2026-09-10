@@ -80,9 +80,12 @@ rejected credentials, rate limits, and upstream failures without exposing the
 key or upstream error bodies. Requests are not automatically retried.
 
 Sign in as administrator and choose **Search movies**, or open
-`/admin/movies/search`. Enter a title, browse the result pages, and select a movie by title and release
-year. Click **Add to catalog** to save it. Movies already in the catalog are
-not duplicated or overwritten. Adding a movie does not add it to a yearly watchlist.
+`/admin/movies/search`. Choose a challenge year, search for a title, and select a result by title and
+release year. Click **Add to [year]** to save it to the shared catalog and add an
+unscheduled pick for that year. Each year allows up to 31 picks, including repeats.
+Retrying the same selection does not add another pick; search again to intentionally
+add a repeat. Existing catalog metadata and previous years are preserved.
+Day assignment and reordering will follow later.
 If your results expire (after ten minutes) or the app restarts, search again.
 Personal sessions and visitors cannot access this admin tool.
 
@@ -269,6 +272,12 @@ Overwrite Headers replaces `CF-Connecting-IP`. See
 
 ## Database and migrations
 
+During pre-production, schema changes may require resetting test and staging
+databases. For this update, stop the app, remove `screamtober.db` and any
+`screamtober.db-wal` / `screamtober.db-shm` files from your configured
+`DATABASE_DIR`, then restart. This deletes existing test data, including household
+profiles and tokens; provision them again after restarting.
+
 Local runs create `data/screamtober.db`; set `DATABASE_DIR` to change its directory.
 The app opens that directory’s `screamtober.db` directly, creating it when missing;
 it does not search for database files. The directory is created if needed. Database files are ignored by
@@ -276,15 +285,10 @@ Git and excluded from Docker builds. SQLite uses WAL mode, foreign-key enforceme
 a five-second busy timeout, and a single pooled connection. The pure Go driver
 keeps the Docker build independent of CGO.
 
-Goose SQL migrations in `migrations/` are embedded in the binary and applied before
-the HTTP server starts. A database or migration error prevents startup. A
-successful connection and migration check emit an info-level `database initialized`
-log event with the database path on every startup. The initial
-baseline establishes Goose version tracking; the second migration adds the challenge
-schema described below. Migration 3 adds disabled status and personal credentials,
-preserving existing profiles and ratings. Existing profiles need tokens issued from
-the admin portal before they can sign in. sqlc generates database operations from
-SQL in `queries/`. Sign-in sessions remain in memory.
+The application applies its schema automatically before starting the HTTP server.
+A database or migration failure prevents startup. Fresh databases include the
+movie catalog, yearly picks, ratings, and household access tables. Sign-in
+sessions remain in memory, so restarting signs everyone out.
 
 ### Schema
 
@@ -309,10 +313,8 @@ rating authors, including the owner; visitors have read-only access. The schema
 does not authorize HTTP requests. The database allows an empty household for
 bootstrapping, with profiles and credentials created from the admin portal.
 
-Rolling back migration 2 drops all five application tables and their data. Use
-rollback only on disposable databases unless that data loss is explicitly intended.
-Rolling back migration 3 removes personal credentials and disabled status, while
-preserving profiles and ratings.
+Rolling back the initial schema deletes all application tables and their data.
+Use rollback only against disposable databases.
 
 For authoring and inspecting migrations, install the pinned Goose CLI:
 
@@ -322,8 +324,9 @@ goose -dir migrations -s create add_movie_catalog sql
 goose -dir migrations sqlite3 ./data/screamtober.db status
 ```
 
-Put schema changes in new migrations with `-- +goose Up` and `-- +goose Down`
-sections; never rewrite migrations already applied to a deployed database. Restart
+Goose migrations use `-- +goose Up` and `-- +goose Down` sections. During
+pre-production, existing migrations may change and require the reset described
+above. Once production data must be retained, use new migrations instead. Restart
 the local app (or rebuild the Docker image) to apply new migrations. Test rollback
 only against disposable databases. Goose [migration documentation](https://pressly.github.io/goose/documentation/cli-commands/)
 describes the CLI commands.

@@ -25,6 +25,7 @@ type movieSearchHandler struct {
 }
 
 type movieSearchPage struct {
+	Year      int
 	Query     string
 	Error     string
 	Results   []movieChoice
@@ -39,14 +40,18 @@ type movieSearchPage struct {
 
 func (h *movieSearchHandler) search(w http.ResponseWriter, r *http.Request) {
 	data := movieSearchPage{Query: strings.TrimSpace(r.URL.Query().Get("q"))}
+	data.Year = time.Now().Year()
+	if raw := r.URL.Query().Get("year"); raw != "" {
+		data.Year, _ = strconv.Atoi(raw)
+	}
 	status := http.StatusOK
 	page := 1
 	if raw := r.URL.Query().Get("page"); raw != "" {
 		page, _ = strconv.Atoi(raw)
 	}
 	if r.URL.Query().Has("q") {
-		if page < 1 || page > 500 || data.Query == "" || !utf8.ValidString(data.Query) || utf8.RuneCountInString(data.Query) > 200 {
-			data.Error = "Enter a movie title between 1 and 200 characters."
+		if data.Year < 1 || data.Year > 9999 || page < 1 || page > 500 || data.Query == "" || !utf8.ValidString(data.Query) || utf8.RuneCountInString(data.Query) > 200 {
+			data.Error = "Enter a movie title between 1 and 200 characters, a year between 1 and 9999, and a page between 1 and 500."
 			status = http.StatusBadRequest
 			setRequestEvent(r, slog.LevelWarn, "movie search", "outcome", "invalid_query")
 		} else {
@@ -85,7 +90,7 @@ func (h *movieSearchHandler) search(w http.ResponseWriter, r *http.Request) {
 				session, _ := cookieKey(r, adminSessionCookie)
 				data.Reference = h.cache.put(session, data.Query, results.Results)
 				link := func(p int) string {
-					return "/admin/movies/search?" + url.Values{"q": {data.Query}, "page": {strconv.Itoa(p)}}.Encode()
+					return "/admin/movies/search?" + url.Values{"q": {data.Query}, "page": {strconv.Itoa(p)}, "year": {strconv.Itoa(data.Year)}}.Encode()
 				}
 				if page > 1 {
 					data.Previous = link(page - 1)

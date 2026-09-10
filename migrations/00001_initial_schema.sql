@@ -3,6 +3,13 @@ CREATE TABLE users (
     id INTEGER PRIMARY KEY,
     display_name TEXT NOT NULL CHECK (length(trim(display_name)) > 0),
     role TEXT NOT NULL CHECK (role IN ('owner', 'member')),
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    disabled_at TEXT
+) STRICT;
+
+CREATE TABLE user_tokens (
+    user_id INTEGER PRIMARY KEY REFERENCES users (id),
+    token_hash BLOB NOT NULL UNIQUE CHECK (length(token_hash) = 32),
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) STRICT;
 
@@ -46,12 +53,31 @@ CREATE TABLE challenge_movies (
     id INTEGER PRIMARY KEY,
     challenge_id INTEGER NOT NULL REFERENCES challenges (id),
     movie_id INTEGER NOT NULL REFERENCES movies (id),
-    position INTEGER NOT NULL CHECK (position BETWEEN 1 AND 31),
+    position INTEGER CHECK (position BETWEEN 1 AND 31),
     watched_at TEXT,
+    submission_key TEXT UNIQUE,
     UNIQUE (challenge_id, position)
 ) STRICT;
 
 CREATE INDEX challenge_movies_movie_id ON challenge_movies (movie_id);
+
+-- +goose StatementBegin
+CREATE TRIGGER challenge_movies_limit_insert
+BEFORE INSERT ON challenge_movies
+WHEN (SELECT count(*) FROM challenge_movies WHERE challenge_id = NEW.challenge_id) >= 31
+BEGIN
+    SELECT RAISE(ABORT, 'at most 31 entries are allowed');
+END;
+-- +goose StatementEnd
+
+-- +goose StatementBegin
+CREATE TRIGGER challenge_movies_limit_update
+BEFORE UPDATE OF challenge_id ON challenge_movies
+WHEN (SELECT count(*) FROM challenge_movies WHERE challenge_id = NEW.challenge_id) >= 31 AND NEW.challenge_id != OLD.challenge_id
+BEGIN
+    SELECT RAISE(ABORT, 'at most 31 entries are allowed');
+END;
+-- +goose StatementEnd
 
 CREATE TABLE ratings (
     id INTEGER PRIMARY KEY,
@@ -70,4 +96,5 @@ DROP TABLE ratings;
 DROP TABLE challenge_movies;
 DROP TABLE challenges;
 DROP TABLE movies;
+DROP TABLE user_tokens;
 DROP TABLE users;

@@ -28,12 +28,15 @@ func TestAddMovieFromSearch(t *testing.T) {
 		t.Fatal(err)
 	}
 	cookie := adminCookie(t, h)
-	page := portalRequest(h, "GET", "/admin/movies/search?q=Halloween", nil, cookie)
+	page := portalRequest(h, "GET", "/admin/movies/search?q=Halloween&year=2026", nil, cookie)
 	ref := regexp.MustCompile(`name="search_reference" value="([^"]+)"`).FindStringSubmatch(page.Body.String())
 	if len(ref) != 2 || !strings.Contains(page.Body.String(), "1978") || !strings.Contains(page.Body.String(), ">Next</a>") {
 		t.Fatal(page.Body.String())
 	}
-	form := url.Values{"search_reference": {ref[1]}, "movie_id": {"948"}, "title": {"Forged title"}, "overview": {"Forged overview"}}
+	if !strings.Contains(page.Body.String(), "year=2026") || !strings.Contains(page.Body.String(), "Add to 2026") {
+		t.Fatal("year missing from form or pagination")
+	}
+	form := url.Values{"year": {"2026"}, "search_reference": {ref[1]}, "movie_id": {"948"}, "title": {"Forged title"}, "overview": {"Forged overview"}}
 	other := adminCookie(t, h)
 	if w := portalRequest(h, "POST", "/admin/movies", form, other); w.Code != 400 {
 		t.Fatal("another session used search", w.Code)
@@ -55,7 +58,7 @@ func TestAddMovieFromSearch(t *testing.T) {
 		t.Fatal("uncached movie accepted", w.Code)
 	}
 	form.Set("movie_id", "948")
-	for _, want := range []string{"added to your catalog", "already in your catalog"} {
+	for _, want := range []string{"added to 2026", "already in 2026"} {
 		w := portalRequest(h, "POST", "/admin/movies", form, cookie)
 		if w.Code != 200 || !strings.Contains(w.Body.String(), want) {
 			t.Fatal(w.Code, w.Body.String())
@@ -69,9 +72,18 @@ func TestAddMovieFromSearch(t *testing.T) {
 		t.Fatal("save made another TMDB call", stub.calls)
 	}
 	var count int
-	if err := db.QueryRow("SELECT count(*) FROM challenge_movies").Scan(&count); err != nil || count != 0 {
-		t.Fatal("catalog save changed watchlist", err, count)
+	if err := db.QueryRow("SELECT count(*) FROM challenge_movies").Scan(&count); err != nil || count != 1 {
+		t.Fatal("yearly pick not saved", err, count)
 	}
+	public := portalRequest(h, "GET", "/challenges/2026", nil)
+	if public.Code != 200 || !strings.Contains(public.Body.String(), "Unscheduled") || !strings.Contains(public.Body.String(), "Halloween") {
+		t.Fatal("unscheduled pick not visible", public.Body.String())
+	}
+	form.Set("year", "invalid")
+	if w := portalRequest(h, "POST", "/admin/movies", form, cookie); w.Code != 400 {
+		t.Fatal("invalid year accepted")
+	}
+	form.Set("year", "2026")
 	// Logging out revokes the session even while its cached search still exists.
 	portalRequest(h, "POST", "/admin/logout", nil, cookie)
 	if w := portalRequest(h, "POST", "/admin/movies", form, cookie); w.Code != 403 {

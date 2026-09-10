@@ -13,13 +13,13 @@ import (
 const addChallengeMovie = `-- name: AddChallengeMovie :one
 INSERT INTO challenge_movies (challenge_id, movie_id, position)
 VALUES (?, ?, ?)
-RETURNING id, challenge_id, movie_id, position, watched_at
+RETURNING id, challenge_id, movie_id, position, watched_at, submission_key
 `
 
 type AddChallengeMovieParams struct {
 	ChallengeID int64
 	MovieID     int64
-	Position    int64
+	Position    sql.NullInt64
 }
 
 func (q *Queries) AddChallengeMovie(ctx context.Context, arg AddChallengeMovieParams) (ChallengeMovie, error) {
@@ -31,6 +31,62 @@ func (q *Queries) AddChallengeMovie(ctx context.Context, arg AddChallengeMoviePa
 		&i.MovieID,
 		&i.Position,
 		&i.WatchedAt,
+		&i.SubmissionKey,
+	)
+	return i, err
+}
+
+const addUnscheduledMovie = `-- name: AddUnscheduledMovie :one
+INSERT INTO challenge_movies (challenge_id, movie_id, submission_key)
+VALUES (?, ?, ?)
+RETURNING id, challenge_id, movie_id, position, watched_at, submission_key
+`
+
+type AddUnscheduledMovieParams struct {
+	ChallengeID   int64
+	MovieID       int64
+	SubmissionKey sql.NullString
+}
+
+func (q *Queries) AddUnscheduledMovie(ctx context.Context, arg AddUnscheduledMovieParams) (ChallengeMovie, error) {
+	row := q.db.QueryRowContext(ctx, addUnscheduledMovie, arg.ChallengeID, arg.MovieID, arg.SubmissionKey)
+	var i ChallengeMovie
+	err := row.Scan(
+		&i.ID,
+		&i.ChallengeID,
+		&i.MovieID,
+		&i.Position,
+		&i.WatchedAt,
+		&i.SubmissionKey,
+	)
+	return i, err
+}
+
+const countChallengeMovies = `-- name: CountChallengeMovies :one
+SELECT count(*) FROM challenge_movies WHERE challenge_id = ?
+`
+
+func (q *Queries) CountChallengeMovies(ctx context.Context, challengeID int64) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countChallengeMovies, challengeID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const getEntryBySubmission = `-- name: GetEntryBySubmission :one
+SELECT id, challenge_id, movie_id, position, watched_at, submission_key FROM challenge_movies WHERE submission_key = ?
+`
+
+func (q *Queries) GetEntryBySubmission(ctx context.Context, submissionKey sql.NullString) (ChallengeMovie, error) {
+	row := q.db.QueryRowContext(ctx, getEntryBySubmission, submissionKey)
+	var i ChallengeMovie
+	err := row.Scan(
+		&i.ID,
+		&i.ChallengeID,
+		&i.MovieID,
+		&i.Position,
+		&i.WatchedAt,
+		&i.SubmissionKey,
 	)
 	return i, err
 }
@@ -41,14 +97,14 @@ SELECT cm.id, cm.challenge_id, cm.movie_id, cm.position, cm.watched_at,
 FROM challenge_movies AS cm
 JOIN movies AS m ON m.id = cm.movie_id
 WHERE cm.challenge_id = ?
-ORDER BY cm.position
+ORDER BY cm.position IS NULL, cm.position, cm.id
 `
 
 type ListChallengeMoviesRow struct {
 	ID          int64
 	ChallengeID int64
 	MovieID     int64
-	Position    int64
+	Position    sql.NullInt64
 	WatchedAt   sql.NullString
 	TmdbID      int64
 	Title       string
@@ -95,7 +151,7 @@ const setChallengeMovieWatchedAt = `-- name: SetChallengeMovieWatchedAt :one
 UPDATE challenge_movies
 SET watched_at = ?1
 WHERE id = ?2 AND challenge_id = ?3
-RETURNING id, challenge_id, movie_id, position, watched_at
+RETURNING id, challenge_id, movie_id, position, watched_at, submission_key
 `
 
 type SetChallengeMovieWatchedAtParams struct {
@@ -114,6 +170,7 @@ func (q *Queries) SetChallengeMovieWatchedAt(ctx context.Context, arg SetChallen
 		&i.MovieID,
 		&i.Position,
 		&i.WatchedAt,
+		&i.SubmissionKey,
 	)
 	return i, err
 }
