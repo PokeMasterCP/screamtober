@@ -104,9 +104,9 @@ Use structured JSON with request ID, client IP, method, path, status, duration, 
 
 ## Development workflow
 
-Follow `CONTRIBUTING.md` for branches and releases. Start new feature branches
-from current `origin/staging`, target feature PRs at `staging`, and squash-merge
-them. Promote `staging` to `main` with a regular merge commit, never squash or
+Start new feature branches from current `origin/staging`, target feature PRs at
+`staging`, and squash-merge them. Promote `staging` to `main` with a regular
+merge commit, never squash or
 rebase. After promotion, fast-forward staging to main when possible. Do not
 force-push shared branches or delete main/staging. Preserve unfinished work and
 local databases when cleaning up worktrees.
