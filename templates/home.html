@@ -19,7 +19,7 @@
   <div class="hero" id="content">
     <div>
       <p class="eyebrow">The October movie challenge</p>
-      <h1>31 nights.<br>A little <em>fright.</em></h1>
+      <h1>31 nights.<br>A little <span class="hero-accent">fright.</span></h1>
       <p class="hero-copy">A month of old favorites, new nightmares, and one very good reason to stay in. Welcome to our October watchlist.</p>
     </div>
     <div class="ticket" aria-hidden="true"><span class="ticket-top">OCTOBER · 01—31</span><span class="ticket-number">31</span><span class="section-label">Nights of fright<br>Admit the whole household</span></div>
@@ -54,11 +54,11 @@
       {{end}}
     </ol>
     {{else}}
-    <div class="empty-state"><span class="empty-mark" aria-hidden="true">✳</span><h2>The suspense is building.</h2><p>No movies selected for this year yet.</p><p>Our next October lineup is waiting in the wings.</p></div>
+    <div class="empty-state"><h2>The suspense is building.</h2><p>No movies selected for this year yet.</p><p>Our next October lineup is waiting in the wings.</p></div>
     {{end}}
   </section>
   {{else}}
-  <section class="empty-state" aria-labelledby="empty-heading"><span class="empty-mark" aria-hidden="true">✳</span><p class="eyebrow">Coming soon</p><h2 id="empty-heading">The suspense is building.</h2><p>No challenges yet. Check back when the household watchlist is ready.</p></section>
+  <section class="empty-state" aria-labelledby="empty-heading"><p class="eyebrow">Coming soon</p><h2 id="empty-heading">The suspense is building.</h2><p>No challenges yet. Check back when the household watchlist is ready.</p></section>
   {{end}}
   {{template "site_footer"}}
 </main>
