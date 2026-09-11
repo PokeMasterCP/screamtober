@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  {{template "page_head"}}
+  <title>Credits · Screamtober</title>
+  {{template "admin_style"}}
+</head>
+<body>
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand-group"><a class="brand" href="/">Screamtober</a></div>
+    <nav class="account" aria-label="Page navigation"><a class="button secondary small" href="/">Back home</a></nav>
+  </div>
+</header>
+<main>
+  <header class="page-header" id="content">
+    <p class="eyebrow">Credits</p>
+    <h1>Movie data</h1>
+    <p class="lede">Screamtober uses TMDB for movie information and poster artwork.</p>
+  </header>
+  {{template "tmdb_credits"}}
+  {{template "site_footer"}}
+</main>
+</body>
+</html>

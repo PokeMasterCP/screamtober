@@ -9,7 +9,7 @@
 <a class="skip-link" href="#content">Skip to content</a>
 <header class="topbar">
   <div class="topbar-inner">
-    <div class="brand-group"><a class="brand" href="/">Screamtober</a><span class="chip">31 nights · A little fright</span></div>
+    <div class="brand-group"><a class="brand" href="/">Screamtober</a></div>
     <nav class="account" aria-label="Account">
       {{if .SignedIn}}<span class="user-chip"><span class="user-dot" aria-hidden="true"></span><span>{{.User.DisplayName}}</span></span><form method="post" action="/logout"><button class="secondary small" type="submit">Sign out</button></form>
       {{else}}<a class="button secondary small" href="/login">Sign in</a>{{end}}
@@ -26,16 +26,15 @@
     </div>
     <div class="feature-layout" id="movie-{{.ID}}">
       <div class="movie-poster feature-poster" aria-hidden="true"><span>Poster unavailable</span>{{if .PosterURL}}<img src="{{.PosterURL}}" alt="" width="500" height="750" fetchpriority="high" decoding="async" referrerpolicy="no-referrer">{{end}}</div>
-      <div>
-        <h1 class="feature-title" id="feature-title">{{.Title}}</h1>
+      <div class="feature-details">
+        <div class="feature-title-wrap">
+          <p class="feature-kicker">Featured movie</p>
+          <h1 class="feature-title" id="feature-title">{{.Title}}</h1>
+          {{if .ReleaseDate.Valid}}<ul class="feature-meta"><li>Released {{.ReleaseDate.String}}</li></ul>{{end}}
+        </div>
         <div class="feature-body">
           <div>
             {{if .Overview.Valid}}<p class="feature-overview">{{.Overview.String}}</p>{{end}}
-            <ul class="feature-meta">
-              {{if .ReleaseDate.Valid}}<li>Released {{.ReleaseDate.String}}</li>{{end}}
-              <li>{{$.Challenge.Year}} challenge</li>
-              <li>Not watched yet</li>
-            </ul>
           </div>
           <aside class="feature-aside" aria-label="Ratings for {{.Title}}">
             <div class="feature-rating">
@@ -96,14 +95,6 @@
     </div>
   </section>
   {{end}}
-  {{if .Challenge}}
-  <div class="stats" role="list" aria-label="{{.Challenge.Year}} challenge progress">
-    <div class="stat" role="listitem"><span class="stat-label">Challenge</span><span class="stat-value">{{.Challenge.Year}}</span></div>
-    <div class="stat" role="listitem"><span class="stat-label">Selected</span><span class="stat-value">{{len .Movies}}<small>/ 31</small></span></div>
-    <div class="stat" role="listitem"><span class="stat-label">Watched</span><span class="stat-value">{{.Watched}}<small>/ 31</small></span></div>
-    <div class="stat stat-progress" role="listitem"><label class="stat-label" for="challenge-progress">Progress</label><span class="stat-value">{{.Watched}}<small>of 31 nights</small></span><progress id="challenge-progress" value="{{.Watched}}" max="31">{{.Watched}} of 31 watched</progress></div>
-  </div>
-  {{end}}
   {{if .Challenges}}
   <nav class="year-nav" aria-label="Challenge years">
     <span class="section-label">Challenge year</span>
@@ -135,11 +126,9 @@
           <div class="movie-poster" aria-hidden="true"><span>Poster unavailable</span>{{if .PosterURL}}<img src="{{.PosterURL}}" alt="" width="500" height="750" loading="lazy" decoding="async" referrerpolicy="no-referrer">{{end}}</div>
           <div class="movie-card-content">
             <div class="movie-meta">
-              <span class="slot">{{if .Position.Valid}}<span class="slot-day">{{printf "%02d" .Position.Int64}}</span><span class="slot-month">October</span>{{else}}<span class="slot-day" aria-hidden="true">—</span><span class="slot-month">Unscheduled</span>{{end}}</span>
-              {{if .WatchedAt.Valid}}<span class="badge watched">Seen</span>{{else}}<span class="badge">Not watched yet</span>{{end}}
+              <span class="slot">{{if .Position.Valid}}<span class="slot-month">October</span><span class="slot-day">{{printf "%02d" .Position.Int64}}</span>{{else}}<span class="slot-month">Unscheduled</span><span class="slot-day" aria-hidden="true">—</span>{{end}}</span>
+              {{if .WatchedAt.Valid}}<span class="badge watched">Seen</span>{{else}}<span class="badge">Unwatched</span>{{end}}
             </div>
-            {{if .ReleaseDate.Valid}}<p class="release">Released {{.ReleaseDate.String}}</p>{{end}}
-            <p class="overview">{{if and .Overview.Valid .Overview.String}}{{.Overview.String}}{{else}}No description available.{{end}}</p>
             <div class="movie-verdict">
               {{if .Ratings}}
               <p class="rating">Household rating: {{.Average}} / 5 ({{len .Ratings}} {{if eq (len .Ratings) 1}}rating{{else}}ratings{{end}})</p>
@@ -176,7 +165,6 @@
   {{else}}
   <section class="empty-state" aria-labelledby="empty-heading"><p class="eyebrow">{{.Year}} movie challenge</p><h2 id="empty-heading">The lineup is still in the making.</h2><p>No movies selected for this year yet.</p><p>Check back for our October picks.</p></section>
   {{end}}
-  {{if .Movies}}{{template "tmdb_credits"}}{{end}}
   {{template "site_footer"}}
 </main>
 <script>
