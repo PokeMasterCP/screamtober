@@ -122,16 +122,13 @@
     <ol class="watchlist" id="challenge-carousel" role="list" tabindex="0" aria-label="{{if .NextMovie}}Other movies in the{{else}}Movies in the{{end}} {{.Year}} challenge" aria-describedby="carousel-hint">
       {{range .Lineup}}
       <li{{if .Position.Valid}} value="{{.Position.Int64}}"{{end}}>
-        <article id="movie-{{.ID}}" class="movie-card{{if .WatchedAt.Valid}} is-watched{{end}}">
+        <article id="movie-{{.ID}}" class="movie-card{{if .WatchedAt.Valid}} is-watched{{end}}" aria-label="{{.Title}}">
           <div class="movie-poster" aria-hidden="true"><span>Poster unavailable</span>{{if .PosterURL}}<img src="{{.PosterURL}}" alt="" width="500" height="750" loading="lazy" decoding="async" referrerpolicy="no-referrer">{{end}}</div>
           <div class="movie-card-content">
             <div class="movie-meta">
-              <span class="slot">{{if .Position.Valid}}<span class="slot-day">{{printf "%02d" .Position.Int64}}</span><span class="slot-month">October</span>{{else}}<span class="slot-day" aria-hidden="true">—</span><span class="slot-month">Unscheduled</span>{{end}}</span>
-              {{if .WatchedAt.Valid}}<span class="badge watched">Seen</span>{{else}}<span class="badge">Not watched yet</span>{{end}}
+              <span class="slot">{{if .Position.Valid}}<span class="slot-month">October</span><span class="slot-day">{{printf "%02d" .Position.Int64}}</span>{{else}}<span class="slot-month">Unscheduled</span><span class="slot-day" aria-hidden="true">—</span>{{end}}</span>
+              {{if .WatchedAt.Valid}}<span class="badge watched">Seen</span>{{else}}<span class="badge">Unwatched</span>{{end}}
             </div>
-            <h3>{{.Title}}</h3>
-            {{if .ReleaseDate.Valid}}<p class="release">Released {{.ReleaseDate.String}}</p>{{end}}
-            <p class="overview">{{if and .Overview.Valid .Overview.String}}{{.Overview.String}}{{else}}No description available.{{end}}</p>
             <div class="movie-verdict">
               {{if .Ratings}}
               <p class="rating">Household rating: {{.Average}} / 5 ({{len .Ratings}} {{if eq (len .Ratings) 1}}rating{{else}}ratings{{end}})</p>
