@@ -300,9 +300,10 @@ Production databases must be preserved. Before upgrading, take a SQLite-consiste
 backup of your persistent database (see the backup instructions below). Keep the
 existing `DATABASE_DIR` volume mounted and restart with the new application image;
 new Goose migrations apply automatically. Do not delete or recreate the database.
-The viewing-service update adds a column in place; existing picks start as
+The viewing-service update adds a column in place; existing picks without a service start as
 **Not decided**, preserving movies, challenge history, watched status, profiles,
-personal tokens, and ratings.
+personal tokens, and ratings. Databases from the earlier PR build that already
+have this column retain their saved service choices as well.
 
 Local runs create `data/screamtober.db`; set `DATABASE_DIR` to change its directory.
 The app opens that directory’s `screamtober.db` directly, creating it when missing;
@@ -342,15 +343,17 @@ bootstrapping, with profiles and credentials created from the admin portal.
 Rolling back the initial schema deletes all application tables and their data.
 Use rollback only against disposable databases.
 
-For authoring and inspecting migrations, install the pinned Goose CLI:
+For authoring SQL migrations, install the pinned Goose CLI:
 
 ```sh
 go install github.com/pressly/goose/v3/cmd/goose@v3.28.0
 goose -dir migrations -s create add_movie_catalog sql
-goose -dir migrations sqlite3 ./data/screamtober.db status
 ```
 
-Goose migrations use `-- +goose Up` and `-- +goose Down` sections. Never edit
+The application registers both SQL and Go migrations; use application startup
+to apply the complete migration set, not the standalone Goose CLI.
+
+Goose SQL migrations use `-- +goose Up` and `-- +goose Down` sections. Never edit
 applied migrations now that production is live; add a new migration instead. Restart
 the local app (or rebuild the Docker image) to apply new migrations. Test rollback
 only against disposable databases. Goose [migration documentation](https://pressly.github.io/goose/documentation/cli-commands/)
@@ -384,7 +387,8 @@ go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1
 go generate ./...
 ```
 
-`sqlc.yaml` reads Goose migrations directly as its schema source, using sqlc's
+`sqlc.yaml` reads Goose SQL migrations and the SQL schema equivalents of Go
+migrations in `schema/` as its schema source, using sqlc's
 [migration support](https://docs.sqlc.dev/en/latest/howto/ddl.html). Edit SQL in
 `queries/`, regenerate, and commit the resulting `internal/store/` files alongside
 the SQL. Do not edit generated Go files. Docker builds use that generated code and

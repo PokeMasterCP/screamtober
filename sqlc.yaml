@@ -1,7 +1,9 @@
 version: "2"
 sql:
   - engine: sqlite
-    schema: migrations
+    schema:
+      - migrations
+      - schema/viewing_service.sql
     queries: queries
     gen:
       go:

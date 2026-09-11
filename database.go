@@ -5,12 +5,10 @@ import (
 	"database/sql"
 	"embed"
 	"fmt"
-	"io/fs"
 	"net/url"
 	"os"
 	"path/filepath"
 
-	"github.com/pressly/goose/v3"
 	_ "modernc.org/sqlite"
 )
 
@@ -47,13 +45,9 @@ func openDatabase(ctx context.Context, path string) (*sql.DB, error) {
 		db.Close()
 		return nil, fmt.Errorf("connect database: %w", err)
 	}
-	migrations, err := fs.Sub(migrationFiles, "migrations")
+	provider, err := newMigrationProvider(db)
 	if err == nil {
-		var provider *goose.Provider
-		provider, err = goose.NewProvider(goose.DialectSQLite3, db, migrations, goose.WithDisableGlobalRegistry(true))
-		if err == nil {
-			_, err = provider.Up(ctx)
-		}
+		_, err = provider.Up(ctx)
 	}
 	if err != nil {
 		db.Close()

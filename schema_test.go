@@ -3,11 +3,8 @@ package main
 import (
 	"context"
 	"database/sql"
-	"io/fs"
 	"path/filepath"
 	"testing"
-
-	"github.com/pressly/goose/v3"
 )
 
 func schemaFixture(t *testing.T) *sql.DB {
@@ -115,11 +112,7 @@ func TestSchemaRollbackAndRebuild(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { db.Close() }()
-	migrations, err := fs.Sub(migrationFiles, "migrations")
-	if err != nil {
-		t.Fatal(err)
-	}
-	provider, err := goose.NewProvider(goose.DialectSQLite3, db, migrations, goose.WithDisableGlobalRegistry(true))
+	provider, err := newMigrationProvider(db)
 	if err != nil {
 		t.Fatal(err)
 	}

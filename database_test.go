@@ -2,11 +2,8 @@ package main
 
 import (
 	"context"
-	"io/fs"
 	"path/filepath"
 	"testing"
-
-	"github.com/pressly/goose/v3"
 )
 
 func TestDatabasePersistenceAndMigrations(t *testing.T) {
@@ -27,11 +24,7 @@ func TestDatabasePersistenceAndMigrations(t *testing.T) {
 	if _, err := db.ExecContext(ctx, "CREATE TABLE existing_data (value TEXT NOT NULL); INSERT INTO existing_data VALUES ('preserved')"); err != nil {
 		t.Fatal(err)
 	}
-	migrations, err := fs.Sub(migrationFiles, "migrations")
-	if err != nil {
-		t.Fatal(err)
-	}
-	provider, err := goose.NewProvider(goose.DialectSQLite3, db, migrations, goose.WithDisableGlobalRegistry(true))
+	provider, err := newMigrationProvider(db)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -103,6 +103,8 @@ Use structured JSON with request ID, client IP, method, path, status, duration, 
 
 ## Development workflow
 Create feature branches from up-to-date `main` and open PRs directly into `main`.
+Use PR titles in the form `<type>(service): summary`, for example
+`feat(watchlist): add viewing services` or `fix(database): preserve existing data during upgrades`.
 CI checks PRs and pushes to `main`; test changes in the temporary PR environment
 before merging. There is no staging-branch promotion step.
 
