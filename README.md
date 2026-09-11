@@ -6,8 +6,8 @@ organized by year.
 
 Designed for personal use by 1–4 people, with public viewing available to everyone.
 The current Go application serves public challenge pages from SQLite with
-individual token sign-in and an administrator-only household portal. Movie and
-rating editing forms are still to come. There is no public registration.
+individual token sign-in and an administrator-only household portal. Personal
+rating controls are available on each movie card. There is no public registration.
 
 ## Challenge pages
 
@@ -25,9 +25,11 @@ and use cached movie metadata; no live TMDB call is needed. Entries without vote
 show “No ratings yet.” Database failures return a generic 500 response and enrich
 the existing request log with the failed operation.
 
-Challenge pages are currently read-only. Personal sessions now identify each rating
-author; future movie-management routes must require an admin session, and future
-rating routes must derive the author from the personal session.
+Sign in with your personal token to choose 1–5 whole stars on a movie card, then
+select **Save rating**. Your existing score is selected when you return; change it
+and select **Update rating** to edit your vote. Everyone can see individual scores
+and the household average. Each appearance of a movie has separate ratings, even
+within the same year. Administrator sessions cannot submit personal ratings.
 
 ## Setup
 

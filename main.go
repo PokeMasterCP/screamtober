@@ -58,6 +58,7 @@ func newHandlerWithMovieSearch(auth *auth, db *sql.DB, movies movieSearcher) (ht
 	challenges := &challengeHandler{queries: store.New(db), auth: auth, pages: pages}
 	mux.HandleFunc("GET /{$}", challenges.home)
 	mux.HandleFunc("GET /challenges/{year}", challenges.byYear)
+	mux.Handle("POST /challenges/{year}/movies/{id}/rating", auth.requireAuth(http.HandlerFunc(challenges.rate)))
 	// Public font files are shared by product and admin pages. Keep the session
 	// boundary around application routes, while allowing both to load fonts.
 	root := http.NewServeMux()
