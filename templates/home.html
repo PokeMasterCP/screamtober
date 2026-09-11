@@ -45,7 +45,7 @@
               {{else}}<p class="rating muted">Nobody has rated this one yet.{{if not $.SignedIn}} Sign in to be the first.{{end}}</p>{{end}}
               {{if $.SignedIn}}
               <form class="rating-form" method="post" action="/challenges/{{$.Year}}/movies/{{.ID}}/rating">
-                <label for="feature-rating-{{.ID}}">Your rating for {{.Title}}</label>
+                <label for="feature-rating-{{.ID}}">Your rating</label>
                 <div class="rating-controls">
                   <select id="feature-rating-{{.ID}}" name="score" required>
                     <option value="" disabled{{if not .YourRating}} selected{{end}}>Choose stars</option>
@@ -136,7 +136,7 @@
               {{else}}<p class="rating muted">No ratings yet.</p>{{end}}
               {{if $.SignedIn}}
               <form class="rating-form" method="post" action="/challenges/{{$.Year}}/movies/{{.ID}}/rating">
-                <label for="rating-{{.ID}}">Your rating for {{.Title}}</label>
+                <label for="rating-{{.ID}}">Your rating</label>
                 <div class="rating-controls">
                   <select id="rating-{{.ID}}" name="score" required>
                     <option value="" disabled{{if not .YourRating}} selected{{end}}>Choose stars</option>
