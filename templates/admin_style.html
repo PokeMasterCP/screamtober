@@ -330,7 +330,7 @@
   .movie-poster { position: relative; aspect-ratio: 2 / 3; flex-shrink: 0; display: grid; place-items: center; overflow: hidden; background: repeating-linear-gradient(135deg, var(--line) 0 1px, var(--bg-elev) 1px 12px); }
   .movie-poster > span { padding: 1rem; color: var(--muted); text-align: center; font: 700 1.25rem/1.2 var(--display); letter-spacing: .08em; text-transform: uppercase; }
   .movie-poster img { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: contain; background: var(--bg-elev); }
-  .movie-card-content { display: flex; flex: 1; flex-direction: column; padding: 1.5rem 1.5rem 1.35rem; }
+  .movie-card-content { display: flex; flex: 1; flex-direction: column; min-width: 0; padding: 1.5rem 1.5rem 1.35rem; }
   .movie-verdict { margin-top: auto; }
   .movie-verdict .rating { margin-top: 0; }
   .movie-card:hover { border-color: var(--line-strong); transform: translateY(-3px); box-shadow: var(--shadow-lift); }
@@ -343,7 +343,6 @@
   .slot-month { margin-top: .35rem; font: 600 .7rem/1.4 var(--body); letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
   .badge { display: inline-flex; align-items: center; gap: .35rem; padding: .3rem .65rem; border-radius: 3px; border: 1px solid var(--line-strong); color: var(--muted); font-size: .66rem; letter-spacing: .1em; white-space: nowrap; margin-top: .2rem; }
   .badge.watched { color: var(--blood-2); border: 2px solid var(--blood-2); background: transparent; font-weight: 800; letter-spacing: .22em; padding: .3rem .6rem; transform: rotate(-6deg); opacity: .9; mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='r'><feTurbulence type='fractalNoise' baseFrequency='.6' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .9 .35'/></filter><rect width='120' height='120' filter='url(%23r)'/></svg>"); -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='r'><feTurbulence type='fractalNoise' baseFrequency='.6' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .9 .35'/></filter><rect width='120' height='120' filter='url(%23r)'/></svg>"); }
-  .movie-card h3 { font-size: 1.85rem; line-height: 1.05; margin: 0 0 .35rem; }
   .release { color: var(--muted); font-size: .86rem; margin: 0 0 1rem; }
   .overview { margin: 0 0 1.25rem; color: var(--ink-2); font-size: .92rem; }
   .rating { margin: auto 0 .35rem; padding-top: 1rem; border-top: 1px solid var(--line); font-size: .86rem; font-weight: 600; color: var(--ink); }
@@ -404,6 +403,7 @@
     .carousel-navigation { align-self: flex-end; }
     .actions { align-items: stretch; flex-direction: column; }
     .actions button, .actions .button { width: 100%; }
+    .auth-panel .actions > a { flex: 0 0 auto; }
     .admin-nav { gap: .25rem 1.1rem; }
     .admin-nav form { margin-left: 0; width: 100%; padding-top: .75rem; }
     .admin-nav form button { width: 100%; }
