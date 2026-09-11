@@ -55,7 +55,6 @@ CREATE TABLE challenge_movies (
     movie_id INTEGER NOT NULL REFERENCES movies (id),
     position INTEGER CHECK (position BETWEEN 1 AND 31),
     watched_at TEXT,
-    viewing_service TEXT NOT NULL DEFAULT '',
     submission_key TEXT UNIQUE,
     UNIQUE (challenge_id, position)
 ) STRICT;

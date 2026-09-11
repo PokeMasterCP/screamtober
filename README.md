@@ -296,11 +296,13 @@ Overwrite Headers replaces `CF-Connecting-IP`. See
 
 ## Database and migrations
 
-During pre-production, schema changes may require resetting test and staging
-databases. For this update, stop the app, remove `screamtober.db` and any
-`screamtober.db-wal` / `screamtober.db-shm` files from your configured
-`DATABASE_DIR`, then restart. This deletes existing test data, including household
-profiles and tokens; provision them again after restarting.
+Production databases must be preserved. Before upgrading, take a SQLite-consistent
+backup of your persistent database (see the backup instructions below). Keep the
+existing `DATABASE_DIR` volume mounted and restart with the new application image;
+new Goose migrations apply automatically. Do not delete or recreate the database.
+The viewing-service update adds a column in place; existing picks start as
+**Not decided**, preserving movies, challenge history, watched status, profiles,
+personal tokens, and ratings.
 
 Local runs create `data/screamtober.db`; set `DATABASE_DIR` to change its directory.
 The app opens that directory’s `screamtober.db` directly, creating it when missing;
@@ -348,9 +350,8 @@ goose -dir migrations -s create add_movie_catalog sql
 goose -dir migrations sqlite3 ./data/screamtober.db status
 ```
 
-Goose migrations use `-- +goose Up` and `-- +goose Down` sections. During
-pre-production, existing migrations may change and require the reset described
-above. Once production data must be retained, use new migrations instead. Restart
+Goose migrations use `-- +goose Up` and `-- +goose Down` sections. Never edit
+applied migrations now that production is live; add a new migration instead. Restart
 the local app (or rebuild the Docker image) to apply new migrations. Test rollback
 only against disposable databases. Goose [migration documentation](https://pressly.github.io/goose/documentation/cli-commands/)
 describes the CLI commands.

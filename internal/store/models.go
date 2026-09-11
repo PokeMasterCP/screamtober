@@ -19,8 +19,8 @@ type ChallengeMovie struct {
 	MovieID        int64
 	Position       sql.NullInt64
 	WatchedAt      sql.NullString
-	ViewingService string
 	SubmissionKey  sql.NullString
+	ViewingService string
 }
 
 type Movie struct {
