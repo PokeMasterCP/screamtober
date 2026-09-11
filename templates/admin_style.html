@@ -200,10 +200,37 @@
   .auth-panel { padding: 2.25rem 2.25rem 2rem; }
   .auth-panel h1 { margin: .35rem 0 .9rem; font-size: 3rem; }
   .auth-panel > p { color: var(--ink-2); }
+  .auth-login { text-align: center; }
+  .auth-login h1 { margin-top: 0; }
+  .auth-login .auth-prompt { max-width: 22rem; margin: .75rem auto 1.5rem; }
+  .auth-login form, .auth-login .error { text-align: left; }
+  .auth-success .auth-panel { text-align: center; }
+  .auth-success .actions { justify-content: center; }
+  .auth-success .actions > a { flex: 0 1 14rem; }
   .auth-panel form > button { width: 100%; margin-top: .5rem; }
   .auth-panel .actions { margin-top: 1.25rem; }
   .auth-panel .actions > a { flex: 1 1 12rem; }
   .auth-back { margin: 1.25rem 0 0; font-size: .9rem; text-align: center; }
+
+  /* ---------- Admin page alignment ---------- */
+  .admin-page .page-header { text-align: center; }
+  .admin-page .page-header .lede { margin-left: auto; margin-right: auto; }
+  .admin-page .admin-nav { justify-content: center; }
+  .admin-page .admin-nav form { margin-left: 0; }
+  .admin-users-page .household-layout { max-width: 68rem; margin-left: auto; margin-right: auto; }
+  .admin-users-page .household-layout > .panel { width: 100%; max-width: 26rem; justify-self: center; text-align: center; }
+  .admin-users-page .household-layout > .panel .eyebrow { justify-content: center; }
+  .admin-users-page .household-layout > .panel form { text-align: left; }
+  .admin-users-page .household-layout > section:last-child { text-align: center; }
+  .admin-users-page .people-heading { justify-content: center; }
+  .admin-users-page .profiles { text-align: left; }
+  .admin-calendar-page .calendar-toolbar,
+  .admin-calendar-page .arrangement,
+  .admin-calendar-page .save-bar { max-width: 72rem; margin-left: auto; margin-right: auto; }
+  .admin-movie-search-page .search-form,
+  .admin-movie-search-page .toolbar-links,
+  .admin-movie-search-page .search-results { max-width: 68rem; margin-left: auto; margin-right: auto; }
+  .admin-movie-search-page .toolbar-links { justify-content: center; }
 
   /* ---------- Movie search ---------- */
   .search-form { margin-bottom: 1.25rem; }
@@ -235,8 +262,13 @@
   .credits { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem 1.5rem; }
   .credits img { display: block; opacity: .8; }
   .credits p { margin: 0; }
-  .site-footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: .5rem 2rem; }
+  .site-footer { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: .5rem 2rem; }
   .site-footer p { margin: 0; }
+  .site-footer p:first-child { grid-column: 2; text-align: center; }
+  .site-footer p:last-child { grid-column: 3; justify-self: end; }
+  .site-footer a { display: inline-flex; align-items: center; gap: .45rem; color: var(--muted); font: 600 .7rem/1.4 var(--body); letter-spacing: .16em; text-decoration: none; text-transform: uppercase; transition: color .15s; }
+  .site-footer a::before { content: ""; width: .35rem; height: .35rem; border-radius: 50%; background: var(--blood); box-shadow: 0 0 9px var(--blood-glow); }
+  .site-footer a:hover { color: var(--ink); }
   .site-footer strong { color: var(--ink-2); font-family: var(--display); font-size: 1rem; letter-spacing: .06em; text-transform: uppercase; }
 
   /* ---------- Home: featured movie ---------- */
@@ -411,6 +443,8 @@
     .search-form .year-field, .search-form .query-field { flex-basis: auto; }
     .user-chip { max-width: 10rem; }
     .profile-head h3 { font-size: 1.5rem; }
+    .site-footer { display: flex; flex-direction: column; align-items: center; text-align: center; }
+    .site-footer p:first-child, .site-footer p:last-child { justify-self: auto; }
   }
 
   /* ---------- Print ---------- */
@@ -456,7 +490,7 @@
 </nav>
 {{end}}
 {{define "site_footer"}}
-<footer class="site-footer"><p><strong>Screamtober</strong> · A household October tradition.</p><p>Lights off. Something good is on.</p></footer>
+<footer class="site-footer"><p><strong>Screamtober</strong> · A household October tradition.</p><p><a href="/credits">Credits</a></p></footer>
 {{end}}
 {{define "tmdb_credits"}}
 <footer class="credits" aria-label="Credits">

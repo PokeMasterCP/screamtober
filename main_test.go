@@ -46,6 +46,8 @@ func TestRoutes(t *testing.T) {
 		status             int
 	}{
 		{"home", http.MethodGet, "/", http.StatusOK},
+		{"login", http.MethodGet, "/login", http.StatusOK},
+		{"credits", http.MethodGet, "/credits", http.StatusOK},
 		{"unknown page", http.MethodGet, "/missing", http.StatusNotFound},
 		{"removed auth status", http.MethodGet, "/auth/status", http.StatusNotFound},
 		{"unsupported method", http.MethodPost, "/", http.StatusMethodNotAllowed},
@@ -57,11 +59,30 @@ func TestRoutes(t *testing.T) {
 				t.Fatalf("status = %d, want %d", response.Code, tt.status)
 			}
 			if tt.name == "home" {
+				body := response.Body.String()
 				if got := response.Header().Get("Content-Type"); got != "text/html; charset=utf-8" {
 					t.Errorf("unexpected Content-Type: %q", got)
 				}
-				if !strings.Contains(response.Body.String(), `<h1>31 nights.<br>A little <span class="hero-accent">fright.</span></h1>`) {
+				if !strings.Contains(body, `<h1>31 nights.<br>A little <span class="hero-accent">fright.</span></h1>`) {
 					t.Error("response does not contain the rendered page heading")
+				}
+				if strings.Contains(body, "Movie data provided by") || strings.Contains(body, "Lights off") {
+					t.Error("homepage contains removed footer copy")
+				}
+			}
+			if tt.name == "login" && strings.Contains(response.Body.String(), `href="/credits"`) {
+				t.Error("login page contains the public footer navigation")
+			}
+			if tt.name == "login" {
+				body := response.Body.String()
+				if !strings.Contains(body, "Use your household token to continue.") || strings.Contains(body, "A personal token signs you in") {
+					t.Error("login page contains the wrong amount of sign-in guidance")
+				}
+			}
+			if tt.name == "credits" {
+				body := response.Body.String()
+				if !strings.Contains(body, "Movie data") || !strings.Contains(body, "This product uses the TMDB API") || strings.Contains(body, "Lights off") {
+					t.Error("credits page does not contain the expected attribution")
 				}
 			}
 		})
