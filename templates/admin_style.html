@@ -104,6 +104,10 @@
   .ratings { list-style: none; padding: 0; margin: .5rem 0 0; color: var(--muted); font-size: .85rem; }
   .ratings li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .25rem 1rem; padding: .35rem 0; }
   .stars { color: var(--accent); letter-spacing: .12em; white-space: nowrap; }
+  .rating-form { border-top: 1px solid var(--line); margin-top: 1rem; }
+  .rating-controls { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: .4rem; }
+  .rating-controls select { flex: 1 1 9rem; width: auto; margin: 0; }
+  .movie-card { scroll-margin-top: 1.5rem; }
   .empty-state { padding: 3.5rem 2rem; text-align: center; border: 1px solid var(--line); background: var(--panel); border-radius: 3px; }
   .empty-state h2 { font-size: 2.4rem; }
   .next-movie { margin-bottom: 2rem; padding: 1.5rem; border: 1px solid var(--line); border-left: 4px solid var(--accent); background: var(--panel); }
@@ -166,7 +170,7 @@
     .watchlist { display: block; }
     .movie-card { break-inside: avoid; margin-bottom: 1rem; }
     .badge, .badge.watched { background: white; color: black; }
-    .synopsis { display: none; }
+    .synopsis, .rating-form { display: none; }
   }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }
 </style>

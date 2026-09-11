@@ -34,8 +34,9 @@ type challengePage struct {
 
 type challengeMovieView struct {
 	store.ListChallengeMoviesRow
-	Ratings []store.ListChallengeRatingsRow
-	Average string
+	Ratings    []store.ListChallengeRatingsRow
+	Average    string
+	YourRating int64
 }
 
 func (h *challengeHandler) home(w http.ResponseWriter, r *http.Request) {
@@ -113,6 +114,9 @@ func (h *challengeHandler) render(w http.ResponseWriter, r *http.Request, challe
 				var total int64
 				for _, rating := range entry.Ratings {
 					total += rating.Score
+					if user != nil && rating.UserID == user.ID {
+						entry.YourRating = rating.Score
+					}
 				}
 				entry.Average = fmt.Sprintf("%.1f", float64(total)/float64(len(entry.Ratings)))
 			}

@@ -62,6 +62,22 @@
           <p class="rating">Household rating: {{.Average}} / 5 ({{len .Ratings}} {{if eq (len .Ratings) 1}}rating{{else}}ratings{{end}})</p>
           <ul class="ratings" aria-label="Individual ratings">{{range .Ratings}}<li><span>{{.DisplayName}}: {{.Score}} / 5</span><span class="stars" aria-hidden="true">{{if ge .Score 1}}★{{else}}☆{{end}}{{if ge .Score 2}}★{{else}}☆{{end}}{{if ge .Score 3}}★{{else}}☆{{end}}{{if ge .Score 4}}★{{else}}☆{{end}}{{if ge .Score 5}}★{{else}}☆{{end}}</span></li>{{end}}</ul>
           {{else}}<p class="rating muted">No ratings yet.</p>{{end}}
+          {{if $.SignedIn}}
+          <form class="rating-form" method="post" action="/challenges/{{$.Year}}/movies/{{.ID}}/rating">
+            <label for="rating-{{.ID}}">Your rating for {{.Title}}</label>
+            <div class="rating-controls">
+              <select id="rating-{{.ID}}" name="score" required>
+                <option value="" disabled{{if not .YourRating}} selected{{end}}>Choose stars</option>
+                <option value="1"{{if eq .YourRating 1}} selected{{end}}>1 star</option>
+                <option value="2"{{if eq .YourRating 2}} selected{{end}}>2 stars</option>
+                <option value="3"{{if eq .YourRating 3}} selected{{end}}>3 stars</option>
+                <option value="4"{{if eq .YourRating 4}} selected{{end}}>4 stars</option>
+                <option value="5"{{if eq .YourRating 5}} selected{{end}}>5 stars</option>
+              </select>
+              <button type="submit">{{if .YourRating}}Update rating{{else}}Save rating{{end}}</button>
+            </div>
+          </form>
+          {{end}}
         </article>
       </li>
       {{end}}
