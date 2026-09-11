@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
@@ -303,11 +302,6 @@ func (a *auth) logout(w http.ResponseWriter, r *http.Request) {
 
 func (a *auth) adminLogout(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
-	r.Body = http.MaxBytesReader(w, r.Body, 1024)
-	if err := r.ParseForm(); err != nil || !a.validAdminLogoutRequest(r) {
-		http.Error(w, "Invalid logout request.", http.StatusForbidden)
-		return
-	}
 	if key, ok := cookieKey(r, adminSessionCookie); ok {
 		a.mu.Lock()
 		delete(a.adminSessions, key)
@@ -323,30 +317,13 @@ func (a *auth) adminLogout(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 
-func (a *auth) validAdminLogoutRequest(r *http.Request) bool {
-	if subtle.ConstantTimeCompare([]byte(r.PostForm.Get("csrf_token")), []byte(a.adminLogoutCSRFToken())) == 1 {
-		return true
-	}
-	// Preserve the non-browser behavior of CrossOriginProtection for direct
-	// requests that do not carry browser provenance headers.
-	return r.Header.Get("Origin") == "" && r.Header.Get("Sec-Fetch-Site") == ""
-}
-
-func (a *auth) adminLogoutCSRFToken() string {
-	mac := hmac.New(sha256.New, a.adminTokenHash[:])
-	_, _ = mac.Write([]byte("admin-logout"))
-	return base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
-}
-
 func (a *auth) clearAdminCookies(w http.ResponseWriter) {
 	a.setCookie(w, adminSessionCookie, "/", "", -time.Second, time.Unix(1, 0))
 	a.setCookie(w, adminSessionCookie, "/admin", "", -time.Second, time.Unix(1, 0))
 }
 
 // A confirmation response completes sign-in without an automatic second request.
-var loginSuccessPage = template.Must(template.New("login-success").Funcs(template.FuncMap{
-	"adminLogoutToken": func() string { return "" },
-}).ParseFS(templateFiles, "templates/login_success.html", "templates/admin_style.html"))
+var loginSuccessPage = template.Must(template.ParseFS(templateFiles, "templates/login_success.html", "templates/admin_style.html"))
 
 func loginSuccess(w http.ResponseWriter, r *http.Request, admin bool) {
 	w.Header().Set("Cache-Control", "no-store")

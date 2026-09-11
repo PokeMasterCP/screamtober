@@ -172,33 +172,6 @@ func TestAdminOnboardingAndPermissionSeparation(t *testing.T) {
 	}
 }
 
-func TestAdminLogoutAllowsSafariNullOriginWithToken(t *testing.T) {
-	db := schemaFixture(t)
-	_, h := portalFixture(t, db)
-	admin := adminCookie(t, h)
-	page := portalRequest(h, http.MethodGet, "/admin/users", nil, admin)
-	if page.Code != http.StatusOK {
-		t.Fatalf("admin page = %d", page.Code)
-	}
-	match := regexp.MustCompile(`name="csrf_token" value="([^"]+)"`).FindStringSubmatch(page.Body.String())
-	if len(match) != 2 || match[1] == "" {
-		t.Fatal("admin page is missing the logout token")
-	}
-
-	r := httptest.NewRequest(http.MethodPost, "/admin/logout", strings.NewReader(url.Values{"csrf_token": {match[1]}}.Encode()))
-	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	r.Header.Set("Origin", "null")
-	r.AddCookie(admin)
-	w := httptest.NewRecorder()
-	h.ServeHTTP(w, r)
-	if w.Code != http.StatusSeeOther || w.Header().Get("Location") != "/login" {
-		t.Fatalf("Safari-style admin logout = %d %s", w.Code, w.Body.String())
-	}
-	if w := portalRequest(h, http.MethodGet, "/admin/users", nil, admin); w.Code != http.StatusSeeOther || w.Header().Get("Location") != "/login" {
-		t.Fatal("admin session survived logout")
-	}
-}
-
 func TestAdminRoutesRequireAdminAndSameOrigin(t *testing.T) {
 	db := schemaFixture(t)
 	setTestUserToken(t, db, 2, testToken)

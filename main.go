@@ -23,9 +23,7 @@ func newHandler(auth *auth, db *sql.DB) (http.Handler, error) {
 }
 
 func newHandlerWithMovieSearch(auth *auth, db *sql.DB, movies movieSearcher) (http.Handler, error) {
-	pages, err := template.New("pages").Funcs(template.FuncMap{
-		"adminLogoutToken": auth.adminLogoutCSRFToken,
-	}).ParseFS(templateFiles, "templates/*.html")
+	pages, err := template.ParseFS(templateFiles, "templates/*.html")
 	if err != nil {
 		return nil, err
 	}
@@ -72,12 +70,7 @@ func newHandlerWithMovieSearch(auth *auth, db *sql.DB, movies movieSearcher) (ht
 	root := http.NewServeMux()
 	registerFontRoutes(root)
 	root.Handle("/", auth.restrictAdminSession(mux))
-	protection := http.NewCrossOriginProtection()
-	// Safari can send Origin: null for local HTTP form submissions. Logout has
-	// its own synchronizer token, so it can safely use this narrowly scoped
-	// exception while every other mutation remains covered by this middleware.
-	protection.AddInsecureBypassPattern("POST /admin/logout")
-	return protection.Handler(root), nil
+	return http.NewCrossOriginProtection().Handler(root), nil
 }
 
 func main() {

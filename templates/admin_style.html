@@ -486,7 +486,7 @@
   <a href="/admin/users"{{if eq . "household"}} aria-current="page"{{end}}>Household</a>
   <a href="/admin/movies/search"{{if eq . "movies"}} aria-current="page"{{end}}>Search movies</a>
   <a href="/admin/calendar"{{if eq . "calendar"}} aria-current="page"{{end}}>Arrange movies</a>
-  <form method="post" action="/admin/logout" referrerpolicy="same-origin"><input type="hidden" name="csrf_token" value="{{adminLogoutToken}}"><button class="secondary small" type="submit">Sign out of admin</button></form>
+  <form method="post" action="/admin/logout"><button class="secondary small" type="submit">Sign out of admin</button></form>
 </nav>
 {{end}}
 {{define "site_footer"}}
