@@ -29,6 +29,11 @@ func (h *movieSearchHandler) add(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data.Year = year
+	service := r.PostForm.Get("viewing_service")
+	if len(r.PostForm["viewing_service"]) > 1 || !validViewingService(service) {
+		fail(400, "Choose a supported viewing service. Please search again.", "invalid_viewing_service")
+		return
+	}
 	session, _ := cookieKey(r, adminSessionCookie)
 	entry, ok := h.cache.get(r.PostForm.Get("search_reference"), session)
 	if !ok {
@@ -45,7 +50,7 @@ func (h *movieSearchHandler) add(w http.ResponseWriter, r *http.Request) {
 		if movie.ID != id {
 			continue
 		}
-		duplicate, err := addYearlyMovie(r.Context(), h.admin.db, movie, year, r.PostForm.Get("search_reference"))
+		duplicate, err := addYearlyMovie(r.Context(), h.admin.db, movie, year, r.PostForm.Get("search_reference"), service)
 		if errors.Is(err, errYearFull) {
 			fail(409, "That year already has 31 movies. Choose another year or remove a pick before adding more.", "year_full")
 			return

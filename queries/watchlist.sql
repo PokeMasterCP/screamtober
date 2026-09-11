@@ -4,7 +4,7 @@ VALUES (?, ?, ?)
 RETURNING *;
 
 -- name: ListChallengeMovies :many
-SELECT cm.id, cm.challenge_id, cm.movie_id, cm.position, cm.watched_at,
+SELECT cm.id, cm.challenge_id, cm.movie_id, cm.position, cm.watched_at, cm.viewing_service,
        m.tmdb_id, m.title, m.release_date, m.poster_path, m.overview
 FROM challenge_movies AS cm
 JOIN movies AS m ON m.id = cm.movie_id
@@ -19,8 +19,8 @@ WHERE id = sqlc.arg(id) AND challenge_id = sqlc.arg(challenge_id)
 RETURNING *;
 
 -- name: AddUnscheduledMovie :one
-INSERT INTO challenge_movies (challenge_id, movie_id, submission_key)
-VALUES (?, ?, ?)
+INSERT INTO challenge_movies (challenge_id, movie_id, submission_key, viewing_service)
+VALUES (?, ?, ?, ?)
 RETURNING *;
 
 -- name: GetEntryBySubmission :one
