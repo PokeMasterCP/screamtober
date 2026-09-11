@@ -55,6 +55,12 @@ func newHandlerWithMovieSearch(auth *auth, db *sql.DB, movies movieSearcher) (ht
 	})
 	mux.HandleFunc("POST /login", auth.login)
 	mux.HandleFunc("POST /logout", auth.logout)
+	mux.HandleFunc("GET /credits", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		if err := pages.ExecuteTemplate(w, "credits.html", nil); err != nil {
+			setRequestEvent(r, slog.LevelError, "render credits failed", "error", err)
+		}
+	})
 	challenges := &challengeHandler{queries: store.New(db), auth: auth, pages: pages}
 	mux.HandleFunc("GET /{$}", challenges.home)
 	mux.HandleFunc("GET /challenges/{year}", challenges.byYear)

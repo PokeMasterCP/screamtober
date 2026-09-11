@@ -14,19 +14,17 @@
   </div>
 </header>
 <main class="auth-page">
-  <div class="auth-panel panel" id="content">
-    <p class="eyebrow">The household entrance</p>
+  <div class="auth-panel auth-login panel" id="content">
     <h1>Sign in</h1>
-    <p>Enter your login token. A personal token signs you in to the movie challenge; an administrator token opens household management.</p>
+    <p class="auth-prompt">Use your household token to continue.</p>
     {{if .InvalidToken}}<p class="error" id="login-error" role="alert">Invalid login token. Please try again.</p>{{end}}
     <form method="post" action="/login">
-      <label for="token">Login token</label>
+      <label for="token">Household token</label>
       <input id="token" name="token" type="password" autocomplete="current-password" autocapitalize="none" spellcheck="false" required{{if .InvalidToken}} aria-invalid="true" aria-describedby="login-error"{{end}}>
       <button type="submit">Sign in</button>
     </form>
     <p class="auth-back"><a href="/">← Back to Screamtober</a></p>
   </div>
-  {{template "site_footer"}}
 </main>
 </body>
 </html>
