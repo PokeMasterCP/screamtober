@@ -13,7 +13,7 @@ import (
 const addChallengeMovie = `-- name: AddChallengeMovie :one
 INSERT INTO challenge_movies (challenge_id, movie_id, position)
 VALUES (?, ?, ?)
-RETURNING id, challenge_id, movie_id, position, watched_at, viewing_service, submission_key
+RETURNING id, challenge_id, movie_id, position, watched_at, submission_key, viewing_service
 `
 
 type AddChallengeMovieParams struct {
@@ -31,8 +31,8 @@ func (q *Queries) AddChallengeMovie(ctx context.Context, arg AddChallengeMoviePa
 		&i.MovieID,
 		&i.Position,
 		&i.WatchedAt,
-		&i.ViewingService,
 		&i.SubmissionKey,
+		&i.ViewingService,
 	)
 	return i, err
 }
@@ -40,7 +40,7 @@ func (q *Queries) AddChallengeMovie(ctx context.Context, arg AddChallengeMoviePa
 const addUnscheduledMovie = `-- name: AddUnscheduledMovie :one
 INSERT INTO challenge_movies (challenge_id, movie_id, submission_key, viewing_service)
 VALUES (?, ?, ?, ?)
-RETURNING id, challenge_id, movie_id, position, watched_at, viewing_service, submission_key
+RETURNING id, challenge_id, movie_id, position, watched_at, submission_key, viewing_service
 `
 
 type AddUnscheduledMovieParams struct {
@@ -64,8 +64,8 @@ func (q *Queries) AddUnscheduledMovie(ctx context.Context, arg AddUnscheduledMov
 		&i.MovieID,
 		&i.Position,
 		&i.WatchedAt,
-		&i.ViewingService,
 		&i.SubmissionKey,
+		&i.ViewingService,
 	)
 	return i, err
 }
@@ -91,7 +91,7 @@ func (q *Queries) CountChallengeMovies(ctx context.Context, challengeID int64) (
 }
 
 const getEntryBySubmission = `-- name: GetEntryBySubmission :one
-SELECT id, challenge_id, movie_id, position, watched_at, viewing_service, submission_key FROM challenge_movies WHERE submission_key = ?
+SELECT id, challenge_id, movie_id, position, watched_at, submission_key, viewing_service FROM challenge_movies WHERE submission_key = ?
 `
 
 func (q *Queries) GetEntryBySubmission(ctx context.Context, submissionKey sql.NullString) (ChallengeMovie, error) {
@@ -103,8 +103,8 @@ func (q *Queries) GetEntryBySubmission(ctx context.Context, submissionKey sql.Nu
 		&i.MovieID,
 		&i.Position,
 		&i.WatchedAt,
-		&i.ViewingService,
 		&i.SubmissionKey,
+		&i.ViewingService,
 	)
 	return i, err
 }
@@ -171,7 +171,7 @@ const setChallengeMovieWatchedAt = `-- name: SetChallengeMovieWatchedAt :one
 UPDATE challenge_movies
 SET watched_at = ?1
 WHERE id = ?2 AND challenge_id = ?3
-RETURNING id, challenge_id, movie_id, position, watched_at, viewing_service, submission_key
+RETURNING id, challenge_id, movie_id, position, watched_at, submission_key, viewing_service
 `
 
 type SetChallengeMovieWatchedAtParams struct {
@@ -190,8 +190,8 @@ func (q *Queries) SetChallengeMovieWatchedAt(ctx context.Context, arg SetChallen
 		&i.MovieID,
 		&i.Position,
 		&i.WatchedAt,
-		&i.ViewingService,
 		&i.SubmissionKey,
+		&i.ViewingService,
 	)
 	return i, err
 }
