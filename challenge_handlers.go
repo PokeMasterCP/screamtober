@@ -30,12 +30,14 @@ type challengePage struct {
 	// Tonight is true when the next movie is scheduled for today's October date.
 	Tonight bool
 	Movies  []challengeMovieView
+	Lineup  []challengeMovieView
 	Watched int
 	User    *store.User
 }
 
 type challengeMovieView struct {
 	store.ListChallengeMoviesRow
+	PosterURL  string
 	Ratings    []store.ListChallengeRatingsRow
 	Average    string
 	YourRating int64
@@ -108,7 +110,7 @@ func (h *challengeHandler) render(w http.ResponseWriter, r *http.Request, challe
 			byEntry[rating.ChallengeMovieID] = append(byEntry[rating.ChallengeMovieID], rating)
 		}
 		for _, movie := range movies {
-			entry := challengeMovieView{ListChallengeMoviesRow: movie, Ratings: byEntry[movie.ID]}
+			entry := challengeMovieView{ListChallengeMoviesRow: movie, PosterURL: moviePosterURL(movie.PosterPath), Ratings: byEntry[movie.ID]}
 			if movie.WatchedAt.Valid {
 				data.Watched++
 			}
@@ -125,6 +127,8 @@ func (h *challengeHandler) render(w http.ResponseWriter, r *http.Request, challe
 			data.Movies = append(data.Movies, entry)
 			if !movie.WatchedAt.Valid && data.NextMovie == nil {
 				data.NextMovie = &entry
+			} else {
+				data.Lineup = append(data.Lineup, entry)
 			}
 		}
 		now := time.Now()

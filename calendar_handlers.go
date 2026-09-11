@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"regexp"
 	"strconv"
 	"time"
 
@@ -26,8 +25,6 @@ type calendarPage struct {
 	Revision, Error string
 	Saved           bool
 }
-
-var posterPathPattern = regexp.MustCompile(`^/[A-Za-z0-9_-]+\.(jpg|jpeg|png|webp)$`)
 
 func calendarRevision(movies []store.ListChallengeMoviesRow) string {
 	hash := sha256.New()
@@ -79,10 +76,7 @@ func (h *adminHandler) showCalendar(w http.ResponseWriter, r *http.Request, year
 	}
 	data.Revision = calendarRevision(movies)
 	for _, movie := range movies {
-		view := calendarMovie{ListChallengeMoviesRow: movie}
-		if posterPathPattern.MatchString(movie.PosterPath.String) {
-			view.PosterURL = "https://image.tmdb.org/t/p/w500" + movie.PosterPath.String
-		}
+		view := calendarMovie{ListChallengeMoviesRow: movie, PosterURL: moviePosterURL(movie.PosterPath)}
 		data.Movies = append(data.Movies, view)
 	}
 	h.render(w, r, "admin_calendar.html", status, data)

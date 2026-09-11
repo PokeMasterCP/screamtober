@@ -87,7 +87,7 @@ func TestChallengeEmptyStates(t *testing.T) {
 	execSchema(t, db, `DELETE FROM ratings`)
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/challenges/2026", nil))
-	if w.Code != 200 || strings.Count(w.Body.String(), "No ratings yet.") != 2 || strings.Contains(w.Body.String(), "Household rating:") {
+	if w.Code != 200 || strings.Count(w.Body.String(), "No ratings yet.") != 1 || !strings.Contains(w.Body.String(), "Nobody has rated this one yet.") || strings.Contains(w.Body.String(), "Household rating:") {
 		t.Fatal("missing ratings must not become a zero average")
 	}
 }
@@ -132,6 +132,47 @@ func TestChallengeEscapingAndSignedInState(t *testing.T) {
 	}
 }
 
+func TestChallengePosterURLs(t *testing.T) {
+	db := schemaFixture(t)
+	h := challengeHTTPFixture(t, db)
+	cookie := loginCookie(t, h)
+	for _, tt := range []struct {
+		name string
+		path any
+		want string
+	}{
+		{"cached poster", "/poster-123.jpg", "https://image.tmdb.org/t/p/w500/poster-123.jpg"},
+		{"missing poster", nil, ""},
+		{"empty poster", "", ""},
+		{"absolute URL", "https://evil.example/poster.jpg", ""},
+		{"protocol relative URL", "//evil.example/poster.jpg", ""},
+		{"path traversal", "/../poster.jpg", ""},
+		{"attribute injection", `/poster.jpg" onerror="alert(1)`, ""},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			execSchema(t, db, `UPDATE movies SET poster_path = ?`, tt.path)
+			for _, session := range []*http.Cookie{nil, cookie} {
+				w := authRequest(h, "GET", "/challenges/2026", "", session)
+				body := w.Body.String()
+				if w.Code != http.StatusOK {
+					t.Fatalf("challenge = %d", w.Code)
+				}
+				if tt.want != "" {
+					// Each repeated challenge entry has its own poster, including the feature.
+					if count := strings.Count(body, `src="`+tt.want+`"`); count != 2 {
+						t.Errorf("poster count = %d, want 2", count)
+					}
+				} else if strings.Contains(body, `src="https://image.tmdb.org/`) {
+					t.Error("missing or invalid path produced a poster URL")
+				}
+				if strings.Contains(body, "evil.example") || strings.Contains(body, "onerror=") || strings.Contains(body, "ZgotmplZ") {
+					t.Error("unsafe poster metadata reached the page")
+				}
+			}
+		})
+	}
+}
+
 func TestChallengeDatabaseFailureLogging(t *testing.T) {
 	for _, failure := range []string{"closed database", "missing ratings table"} {
 		t.Run(failure, func(t *testing.T) {
@@ -169,9 +210,9 @@ func TestHomeCurrentYearAndNextMovie(t *testing.T) {
 	}{
 		{"missing year", "", "The lineup is still in the making.", "Up next"},
 		{"empty year", "INSERT INTO challenges (id, year) VALUES (3, ?)", "The lineup is still in the making.", "Up next"},
-		{"scheduled before unscheduled", "", `href="#movie-5"`, "You’re all caught up."},
-		{"skip watched", "UPDATE challenge_movies SET watched_at = CURRENT_TIMESTAMP WHERE id = 5", `href="#movie-6"`, "You’re all caught up."},
-		{"unscheduled next", "UPDATE challenge_movies SET watched_at = CURRENT_TIMESTAMP WHERE id IN (5,6)", `href="#movie-4"`, "You’re all caught up."},
+		{"scheduled before unscheduled", "", `class="feature-layout" id="movie-5"`, "You’re all caught up."},
+		{"skip watched", "UPDATE challenge_movies SET watched_at = CURRENT_TIMESTAMP WHERE id = 5", `class="feature-layout" id="movie-6"`, "You’re all caught up."},
+		{"unscheduled next", "UPDATE challenge_movies SET watched_at = CURRENT_TIMESTAMP WHERE id IN (5,6)", `class="feature-layout" id="movie-4"`, "You’re all caught up."},
 		{"all watched", "UPDATE challenge_movies SET watched_at = CURRENT_TIMESTAMP WHERE challenge_id = 3", "You’re all caught up.", "Up next"},
 	} {
 		t.Run(scenario.name, func(t *testing.T) {
@@ -208,8 +249,30 @@ INSERT INTO challenge_movies (id, challenge_id, movie_id, position) VALUES (4,3,
 						t.Fatalf("home unexpectedly contains %q", absent)
 					}
 				}
-				if strings.Contains(scenario.want, "#movie-") && !strings.Contains(body, "&lt;b&gt;Current movie&lt;/b&gt;") {
+				if strings.Contains(scenario.want, "feature-layout") && !strings.Contains(body, "&lt;b&gt;Current movie&lt;/b&gt;") {
 					t.Fatal("missing escaped next movie")
+				}
+				if scenario.name != "missing year" && scenario.name != "empty year" {
+					for _, id := range []int{4, 5, 6} {
+						if count := strings.Count(body, fmt.Sprintf(`id="movie-%d"`, id)); count != 1 {
+							t.Errorf("entry %d rendered %d times, want once across feature and carousel", id, count)
+						}
+						form := fmt.Sprintf(`action="/challenges/%d/movies/%d/rating"`, year, id)
+						wantForms := 0
+						if signedIn {
+							wantForms = 1
+						}
+						if count := strings.Count(body, form); count != wantForms {
+							t.Errorf("entry %d has %d rating forms, want %d", id, count, wantForms)
+						}
+					}
+					wantCards := 2
+					if scenario.name == "all watched" {
+						wantCards = 3
+					}
+					if count := strings.Count(body, `<article id="movie-`); count != wantCards {
+						t.Errorf("carousel contains %d entries, want %d", count, wantCards)
+					}
 				}
 			}
 			var count int
@@ -220,5 +283,20 @@ INSERT INTO challenge_movies (id, challenge_id, movie_id, position) VALUES (4,3,
 				t.Fatal("home created a challenge")
 			}
 		})
+	}
+}
+
+func TestChallengeSingleFeaturedMovie(t *testing.T) {
+	db := schemaFixture(t)
+	h := challengeHTTPFixture(t, db)
+	for _, cookie := range []*http.Cookie{nil, loginCookie(t, h)} {
+		w := authRequest(h, "GET", "/challenges/2027", "", cookie)
+		body := w.Body.String()
+		if w.Code != http.StatusOK || !strings.Contains(body, `id="movie-3"`) || !strings.Contains(body, "Your only pick is featured above.") {
+			t.Fatal("single entry must remain accessible in the feature")
+		}
+		if strings.Contains(body, `id="challenge-carousel"`) || strings.Contains(body, "No movies selected for this year yet.") {
+			t.Fatal("single featured entry should not create an empty carousel or missing-movies message")
+		}
 	}
 }

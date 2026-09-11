@@ -21,9 +21,15 @@ rating controls are available on each movie card. There is no public registratio
   years return 404.
 
 Year links let visitors browse earlier challenges. Pages read SQLite on each request
-and use cached movie metadata; no live TMDB call is needed. Entries without votes
-show “No ratings yet.” Database failures return a generic 500 response and enrich
-the existing request log with the failed operation.
+and use cached movie metadata; no live TMDB API call is needed. The featured movie
+has a large poster, with the rest of the lineup in a horizontal carousel. Swipe,
+scroll, or use the arrow buttons to browse; keyboard users can focus the lineup
+and use arrow keys, Home, or End. Movie cards show posters and full descriptions,
+with equal-sized cards throughout the carousel. Swiping and scrolling also work
+without JavaScript.
+Posters load from TMDB's image service; unavailable posters have a placeholder.
+Entries without votes show “No ratings yet.” Database failures return a generic
+500 response and enrich the existing request log with the failed operation.
 
 Sign in with your personal token to choose 1–5 whole stars on a movie card, then
 select **Save rating**. Your existing score is selected when you return; change it
