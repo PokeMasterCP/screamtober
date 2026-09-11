@@ -15,7 +15,10 @@ var errYearFull = errors.New("year already has 31 movies")
 
 // Save the catalog metadata and yearly pick together. A retry of the same
 // selection is idempotent; a new search can intentionally add another appearance.
-func addYearlyMovie(ctx context.Context, db *sql.DB, movie tmdb.MovieSummary, year int, reference string) (bool, error) {
+func addYearlyMovie(ctx context.Context, db *sql.DB, movie tmdb.MovieSummary, year int, reference string, service string) (bool, error) {
+	if !validViewingService(service) {
+		return false, errViewingService
+	}
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return false, err
@@ -48,7 +51,7 @@ func addYearlyMovie(ctx context.Context, db *sql.DB, movie tmdb.MovieSummary, ye
 	if err != nil {
 		return false, err
 	}
-	_, err = q.AddUnscheduledMovie(ctx, store.AddUnscheduledMovieParams{ChallengeID: challenge.ID, MovieID: cached.ID, SubmissionKey: key})
+	_, err = q.AddUnscheduledMovie(ctx, store.AddUnscheduledMovieParams{ChallengeID: challenge.ID, MovieID: cached.ID, SubmissionKey: key, ViewingService: service})
 	if err != nil {
 		return false, err
 	}

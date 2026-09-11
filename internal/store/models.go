@@ -14,12 +14,13 @@ type Challenge struct {
 }
 
 type ChallengeMovie struct {
-	ID            int64
-	ChallengeID   int64
-	MovieID       int64
-	Position      sql.NullInt64
-	WatchedAt     sql.NullString
-	SubmissionKey sql.NullString
+	ID             int64
+	ChallengeID    int64
+	MovieID        int64
+	Position       sql.NullInt64
+	WatchedAt      sql.NullString
+	ViewingService string
+	SubmissionKey  sql.NullString
 }
 
 type Movie struct {

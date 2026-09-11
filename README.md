@@ -94,7 +94,11 @@ key or upstream error bodies. Requests are not automatically retried.
 Sign in as administrator and choose **Search movies**, or open
 `/admin/movies/search`. Choose a challenge year, search for a title, and select a result by title and
 release year. Results are shown ten at a time; use **Next** and **Previous** to page
-through more matches. Click **Add to [year]** to save it to the shared catalog and add an
+through more matches. Choose a service under **Watching on**, or leave **Not decided**
+selected. The choice belongs to that yearly pick, so repeats can use different
+services. Its logo appears on the challenge page as **Watching on** or **Watched on**.
+This records your choice; it does not check regional streaming availability.
+Click **Add to [year]** to save it to the shared catalog and add an
 unscheduled pick for that year. Each year allows up to 31 picks, including repeats.
 Retrying the same selection does not add another pick; search again to intentionally
 add a repeat. Existing catalog metadata and previous years are preserved.

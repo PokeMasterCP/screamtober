@@ -30,6 +30,7 @@
         <div class="feature-title-wrap">
           <p class="feature-kicker">Featured movie</p>
           <h1 class="feature-title" id="feature-title">{{.Title}}</h1>
+          {{template "viewing_service" .}}
           {{if .ReleaseDate.Valid}}<ul class="feature-meta"><li>Released {{.ReleaseDate.String}}</li></ul>{{end}}
         </div>
         <div class="feature-body">
@@ -129,6 +130,7 @@
               <span class="slot">{{if .Position.Valid}}<span class="slot-month">October</span><span class="slot-day">{{printf "%02d" .Position.Int64}}</span>{{else}}<span class="slot-month">Unscheduled</span><span class="slot-day" aria-hidden="true">—</span>{{end}}</span>
               {{if .WatchedAt.Valid}}<span class="badge watched">Seen</span>{{else}}<span class="badge">Unwatched</span>{{end}}
             </div>
+            {{template "viewing_service" .}}
             <div class="movie-verdict">
               {{if .Ratings}}
               <p class="rating">Household rating: {{.Average}} / 5 ({{len .Ratings}} {{if eq (len .Ratings) 1}}rating{{else}}ratings{{end}})</p>

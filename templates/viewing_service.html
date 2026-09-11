@@ -1,0 +1,3 @@
+{{define "viewing_service"}}
+<p class="viewing-service">{{if .Service.Icon}}<img src="{{.Service.Icon}}" alt="" width="36" height="36" loading="lazy">{{end}}<span><small>{{if .WatchedAt.Valid}}Watched on{{else}}Watching on{{end}}</small>{{.Service.Name}}</span></p>
+{{end}}
