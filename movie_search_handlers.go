@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -23,6 +24,12 @@ type movieSearchHandler struct {
 	movies movieSearcher
 	cache  movieSearchCache
 }
+
+// TMDB returns 20 results per page; showing half keeps the add button within reach.
+const movieSearchPageSize = 10
+
+// Two displayed pages cover one TMDB page, and TMDB serves at most 500 pages.
+const movieSearchMaxPage = 1000
 
 type movieSearchPage struct {
 	Year      int
@@ -50,15 +57,24 @@ func (h *movieSearchHandler) search(w http.ResponseWriter, r *http.Request) {
 		page, _ = strconv.Atoi(raw)
 	}
 	if r.URL.Query().Has("q") {
-		if data.Year < 1 || data.Year > 9999 || page < 1 || page > 500 || data.Query == "" || !utf8.ValidString(data.Query) || utf8.RuneCountInString(data.Query) > 200 {
-			data.Error = "Enter a movie title between 1 and 200 characters, a year between 1 and 9999, and a page between 1 and 500."
+		if data.Year < 1 || data.Year > 9999 || page < 1 || page > movieSearchMaxPage || data.Query == "" || !utf8.ValidString(data.Query) || utf8.RuneCountInString(data.Query) > 200 {
+			data.Error = fmt.Sprintf("Enter a movie title between 1 and 200 characters, a year between 1 and 9999, and a page between 1 and %d.", movieSearchMaxPage)
 			status = http.StatusBadRequest
 			setRequestEvent(r, slog.LevelWarn, "movie search", "outcome", "invalid_query")
 		} else {
-			// Leave time to render within the server's ten-second write timeout.
-			ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
-			results, err := h.movies.SearchMovies(ctx, data.Query, tmdb.SearchOptions{Page: page})
-			cancel()
+			upstreamPage := (page + 1) / 2
+			offset := ((page - 1) % 2) * movieSearchPageSize
+			session, _ := cookieKey(r, adminSessionCookie)
+			entry, cached := h.cache.find(session, data.Query, upstreamPage)
+			var err error
+			if !cached {
+				// Leave time to render within the server's ten-second write timeout.
+				ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
+				var results tmdb.SearchResults
+				results, err = h.movies.SearchMovies(ctx, data.Query, tmdb.SearchOptions{Page: upstreamPage})
+				cancel()
+				entry = cachedMovieSearch{session: session, query: data.Query, results: results, expires: time.Now().Add(searchCacheTTL)}
+			}
 			if err != nil {
 				status = http.StatusBadGateway
 				data.Error = "Movie search is unavailable right now. Please try again later."
@@ -75,10 +91,12 @@ func (h *movieSearchHandler) search(w http.ResponseWriter, r *http.Request) {
 				}
 				setRequestEvent(r, slog.LevelWarn, "movie search", "outcome", outcome, "search_term", data.Query)
 			} else {
+				results := entry.results
 				data.Searched = true
 				data.Page = page
-				data.Empty = len(results.Results) == 0
-				for _, movie := range results.Results {
+				shown := results.Results[min(offset, len(results.Results)):min(offset+movieSearchPageSize, len(results.Results))]
+				data.Empty = len(shown) == 0
+				for _, movie := range shown {
 					year := "Year unknown"
 					if movie.ReleaseDate != nil {
 						if date, err := time.Parse("2006-01-02", *movie.ReleaseDate); err == nil {
@@ -87,15 +105,15 @@ func (h *movieSearchHandler) search(w http.ResponseWriter, r *http.Request) {
 					}
 					data.Results = append(data.Results, movieChoice{ID: movie.ID, Title: movie.Title, Year: year})
 				}
-				session, _ := cookieKey(r, adminSessionCookie)
-				data.Reference = h.cache.put(session, data.Query, results.Results)
+				// A fresh reference allows intentional repeat picks while keeping POST retries idempotent.
+				data.Reference = h.cache.put(entry)
 				link := func(p int) string {
 					return "/admin/movies/search?" + url.Values{"q": {data.Query}, "page": {strconv.Itoa(p)}, "year": {strconv.Itoa(data.Year)}}.Encode()
 				}
 				if page > 1 {
 					data.Previous = link(page - 1)
 				}
-				if page < results.TotalPages && page < 500 {
+				if page < movieSearchMaxPage && (offset+movieSearchPageSize < len(results.Results) || upstreamPage < results.TotalPages) {
 					data.Next = link(page + 1)
 				}
 

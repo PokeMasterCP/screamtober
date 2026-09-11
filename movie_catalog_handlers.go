@@ -41,7 +41,7 @@ func (h *movieSearchHandler) add(w http.ResponseWriter, r *http.Request) {
 		fail(400, "Select a movie from the search results. Please search again.", "invalid_selection")
 		return
 	}
-	for _, movie := range entry.movies {
+	for _, movie := range entry.results.Results {
 		if movie.ID != id {
 			continue
 		}

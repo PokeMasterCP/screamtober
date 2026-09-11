@@ -1,25 +1,31 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  {{template "page_head"}}
   <title>Personal token created · Screamtober</title>
   {{template "admin_style"}}
 </head>
 <body>
+{{template "admin_masthead"}}
 <main class="token-page">
-  {{template "admin_masthead"}}
-  <header id="content"><p class="eyebrow">Screamtober / Administration</p><h1>Personal token created</h1>{{template "admin_nav" "household"}}</header>
-  <p>Access is ready for <strong>{{.Name}}</strong>.</p>
+  <header class="page-header" id="content">
+    <p class="eyebrow">Administration</p>
+    <h1>Personal token created</h1>
+    <p class="lede">Access is ready for <strong>{{.Name}}</strong>. This is the only time the token will be shown.</p>
+    {{template "admin_nav" "household"}}
+  </header>
   <div class="token-panel">
     <label for="new-token">Personal login token</label>
-    <input class="token" id="new-token" type="text" value="{{.Token}}" readonly autocomplete="off" spellcheck="false" aria-describedby="token-help">
-    <p id="token-help">Copy this token now and share it privately with {{.Name}}. It cannot be retrieved after you leave this page.</p>
+    <input class="token" id="new-token" type="text" value="{{.Token}}" readonly autocomplete="off" spellcheck="false" aria-describedby="token-help" onfocus="this.select()">
+    <p class="help" id="token-help">Copy this token now and share it privately with {{.Name}}. It cannot be retrieved after you leave this page.</p>
   </div>
-  <p>They can enter it on the site's sign-in page. Keep it in a password manager for future sign-ins.</p>
-  <p>To use your own personal token, sign out of admin first.</p>
-  <p>If it is lost, create a replacement from the household page. Previous tokens and sessions will stop working.</p>
-  <p><a class="button secondary" href="/admin/users">Back to household</a></p>
+  <ol class="steps">
+    <li>Share the token through a private channel. {{.Name}} enters it on the site's sign-in page.</li>
+    <li>Suggest keeping it in a password manager for future sign-ins.</li>
+    <li>If it is ever lost, create a replacement from the household page. Previous tokens and sessions stop working immediately.</li>
+    <li>To use your own personal token, sign out of admin first.</li>
+  </ol>
+  <div class="actions"><a class="button" href="/admin/users">Back to household</a></div>
   {{template "site_footer"}}
 </main>
 </body>

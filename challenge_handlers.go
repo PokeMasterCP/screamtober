@@ -27,9 +27,11 @@ type challengePage struct {
 	Challenge  *store.Challenge
 	Year       int64
 	NextMovie  *challengeMovieView
-	Movies     []challengeMovieView
-	Watched    int
-	User       *store.User
+	// Tonight is true when the next movie is scheduled for today's October date.
+	Tonight bool
+	Movies  []challengeMovieView
+	Watched int
+	User    *store.User
 }
 
 type challengeMovieView struct {
@@ -124,6 +126,10 @@ func (h *challengeHandler) render(w http.ResponseWriter, r *http.Request, challe
 			if !movie.WatchedAt.Valid && data.NextMovie == nil {
 				data.NextMovie = &entry
 			}
+		}
+		now := time.Now()
+		if data.NextMovie != nil && now.Month() == time.October && int64(now.Year()) == selected.Year && data.NextMovie.Position.Valid && data.NextMovie.Position.Int64 == int64(now.Day()) {
+			data.Tonight = true
 		}
 	}
 	var body bytes.Buffer

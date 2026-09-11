@@ -28,10 +28,13 @@ func TestCalendarArrangement(t *testing.T) {
 	if page.Code != 200 {
 		t.Fatal(page.Code, page.Body.String())
 	}
-	for _, want := range []string{"https://image.tmdb.org/t/p/w500/poster.jpg", `data-day="31"`, `name="entry_1"`, `value="1" selected`} {
+	for _, want := range []string{"https://image.tmdb.org/t/p/w500/poster.jpg", `data-day="31"`, `name="entry_1" value="1"`, `name="entry_2" value="2"`} {
 		if !strings.Contains(page.Body.String(), want) {
 			t.Errorf("missing %s", want)
 		}
+	}
+	if strings.Contains(page.Body.String(), "<select") {
+		t.Error("calendar still renders a day dropdown; arrangement is drag-and-drop only")
 	}
 	form := url.Values{"revision": {calendarRevision(original)}, "entry_1": {"2"}, "entry_2": {"1"}}
 	if w := portalRequest(h, "POST", path, form, admin); w.Code != 303 {
