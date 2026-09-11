@@ -1,28 +1,32 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Sign in · Screamtober</title>
-    {{template "admin_style"}}
-  </head>
-  <body>
-    <a class="skip-link" href="#content">Skip to content</a>
-    <main class="auth-page">
-      <div class="masthead"><span class="brand">Screamtober</span><span class="masthead-note">Admit one</span></div>
-      <div class="auth-panel panel" id="content">
-        <p class="eyebrow">The household entrance</p>
-        <h1>Sign in</h1>
-        <p>Enter your login token. A personal token signs you in to the movie challenge; an administrator token opens household management.</p>
-        {{if .InvalidToken}}<p class="error" id="login-error" role="alert">Invalid login token. Please try again.</p>{{end}}
-        <form method="post" action="/login">
-          <label for="token">Login token</label>
-          <input id="token" name="token" type="password" autocomplete="current-password" autocapitalize="none" spellcheck="false" required{{if .InvalidToken}} aria-invalid="true" aria-describedby="login-error"{{end}}>
-          <button type="submit">Sign in</button>
-        </form>
-        <p><a href="/">Back to Screamtober</a></p>
-      </div>
-      {{template "site_footer"}}
-    </main>
-  </body>
+<head>
+  {{template "page_head"}}
+  <title>Sign in · Screamtober</title>
+  {{template "admin_style"}}
+</head>
+<body>
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand-group"><a class="brand" href="/">Screamtober</a></div>
+    <span class="chip">Admit one</span>
+  </div>
+</header>
+<main class="auth-page">
+  <div class="auth-panel panel" id="content">
+    <p class="eyebrow">The household entrance</p>
+    <h1>Sign in</h1>
+    <p>Enter your login token. A personal token signs you in to the movie challenge; an administrator token opens household management.</p>
+    {{if .InvalidToken}}<p class="error" id="login-error" role="alert">Invalid login token. Please try again.</p>{{end}}
+    <form method="post" action="/login">
+      <label for="token">Login token</label>
+      <input id="token" name="token" type="password" autocomplete="current-password" autocapitalize="none" spellcheck="false" required{{if .InvalidToken}} aria-invalid="true" aria-describedby="login-error"{{end}}>
+      <button type="submit">Sign in</button>
+    </form>
+    <p class="auth-back"><a href="/">← Back to Screamtober</a></p>
+  </div>
+  {{template "site_footer"}}
+</main>
+</body>
 </html>

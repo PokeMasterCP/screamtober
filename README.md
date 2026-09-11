@@ -87,19 +87,19 @@ key or upstream error bodies. Requests are not automatically retried.
 
 Sign in as administrator and choose **Search movies**, or open
 `/admin/movies/search`. Choose a challenge year, search for a title, and select a result by title and
-release year. Click **Add to [year]** to save it to the shared catalog and add an
+release year. Results are shown ten at a time; use **Next** and **Previous** to page
+through more matches. Click **Add to [year]** to save it to the shared catalog and add an
 unscheduled pick for that year. Each year allows up to 31 picks, including repeats.
 Retrying the same selection does not add another pick; search again to intentionally
 add a repeat. Existing catalog metadata and previous years are preserved.
-Day assignment and reordering will follow later.
 If your results expire (after ten minutes) or the app restarts, search again.
 Personal sessions and visitors cannot access this admin tool.
 
 Choose **Arrange movies** in the admin panel to schedule a year’s added movies.
 Drag posters from the unscheduled tray onto the 31-day October calendar; dropping
-onto an occupied day swaps the two entries. Return a poster to the tray to
-unschedule it. Day selectors also work with a keyboard or on mobile, and without
-JavaScript (choose a unique day for each movie). Choose **Save arrangement** to
+onto an occupied day swaps the two entries. Drag a poster back to the tray to
+unschedule it. Arranging is drag-and-drop only and requires JavaScript and a
+pointer or touch device. Choose **Save arrangement** to
 keep your changes. Ratings and watched status stay with each entry when it moves.
 If another tab changes the lineup, reload and arrange the latest version.
 

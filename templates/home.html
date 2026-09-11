@@ -1,66 +1,138 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  {{template "page_head"}}
   <title>{{if .Challenge}}{{.Challenge.Year}} · {{end}}{{.Title}}{{if .SignedIn}} · Signed in{{end}}</title>
   {{template "admin_style"}}
 </head>
 <body>
 <a class="skip-link" href="#content">Skip to content</a>
-<main>
-  <div class="masthead">
-    <a class="brand" href="/">Screamtober</a>
-    <nav aria-label="Account">
-      {{if .SignedIn}}<span class="muted">{{.User.DisplayName}}</span><form method="post" action="/logout"><button class="secondary" type="submit">Sign out</button></form>
-      {{else}}<a class="button secondary" href="/login">Sign in</a>{{end}}
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand-group"><a class="brand" href="/">Screamtober</a><span class="chip">31 nights · A little fright</span></div>
+    <nav class="account" aria-label="Account">
+      {{if .SignedIn}}<span class="user-chip"><span class="user-dot" aria-hidden="true"></span><span>{{.User.DisplayName}}</span></span><form method="post" action="/logout"><button class="secondary small" type="submit">Sign out</button></form>
+      {{else}}<a class="button secondary small" href="/login">Sign in</a>{{end}}
     </nav>
   </div>
-  <div class="hero" id="content">
+</header>
+<main>
+  {{if and .Challenge .Movies}}
+  {{with .NextMovie}}
+  <section class="feature" id="content" aria-labelledby="feature-title">
+    <div class="feature-top">
+      <p class="now-showing">Now showing · Up next</p>
+      <p class="feature-slot">{{if .Position.Valid}}<span>October</span><b>{{printf "%02d" .Position.Int64}}</b>{{else}}<span>Unscheduled</span>{{end}}{{if $.Tonight}}<span class="tonight">Tonight</span>{{end}}</p>
+    </div>
+    <h1 class="feature-title" id="feature-title"><a href="#movie-{{.ID}}">{{.Title}}</a></h1>
+    <div class="feature-body">
+      <div>
+        {{if .Overview.Valid}}<p class="feature-overview">{{.Overview.String}}</p>{{end}}
+        <ul class="feature-meta">
+          {{if .ReleaseDate.Valid}}<li>Released {{.ReleaseDate.String}}</li>{{end}}
+          <li>{{$.Challenge.Year}} challenge</li>
+          <li>Not watched yet</li>
+        </ul>
+        <div class="actions">
+          <a class="button" href="#movie-{{.ID}}">View movie details <span aria-hidden="true">↓</span></a>
+          <a class="button secondary" href="#challenge-heading">Full lineup</a>
+        </div>
+      </div>
+      <aside class="feature-aside" aria-label="Ratings for {{.Title}}">
+        <div class="feature-rating">
+          <p class="eyebrow">Household verdict</p>
+          {{if .Ratings}}
+          <p class="rating">Household rating: {{.Average}} / 5 ({{len .Ratings}} {{if eq (len .Ratings) 1}}rating{{else}}ratings{{end}})</p>
+          <ul class="ratings" aria-label="Individual ratings">{{range .Ratings}}<li><span>{{.DisplayName}}: {{.Score}} / 5</span>{{template "star_row" .}}</li>{{end}}</ul>
+          {{else}}<p class="rating muted">Nobody has rated this one yet.{{if not $.SignedIn}} Sign in to be the first.{{end}}</p>{{end}}
+          {{if $.SignedIn}}
+          <form class="rating-form" method="post" action="/challenges/{{$.Year}}/movies/{{.ID}}/rating">
+            <label for="feature-rating-{{.ID}}">Your rating for {{.Title}}</label>
+            <div class="rating-controls">
+              <select id="feature-rating-{{.ID}}" name="score" required>
+                <option value="" disabled{{if not .YourRating}} selected{{end}}>Choose stars</option>
+                <option value="1"{{if eq .YourRating 1}} selected{{end}}>1 star</option>
+                <option value="2"{{if eq .YourRating 2}} selected{{end}}>2 stars</option>
+                <option value="3"{{if eq .YourRating 3}} selected{{end}}>3 stars</option>
+                <option value="4"{{if eq .YourRating 4}} selected{{end}}>4 stars</option>
+                <option value="5"{{if eq .YourRating 5}} selected{{end}}>5 stars</option>
+              </select>
+              <button type="submit">{{if .YourRating}}Update rating{{else}}Save rating{{end}}</button>
+            </div>
+          </form>
+          {{end}}
+        </div>
+      </aside>
+    </div>
+  </section>
+  {{else}}
+  <section class="feature is-done" id="content" aria-labelledby="feature-title">
+    <div class="feature-top"><p class="now-showing">All selected movies watched</p><p class="feature-slot"><span>{{.Challenge.Year}}</span></p></div>
+    <h1 class="feature-title" id="feature-title">You’re all caught up.</h1>
+    <div class="feature-body">
+      <div>
+        <p class="feature-overview">Every movie on this year’s list has been watched. Rate the ones that kept you up at night, or relive the lineup below.</p>
+        <div class="actions"><a class="button" href="#challenge-heading">Revisit the lineup <span aria-hidden="true">↓</span></a></div>
+      </div>
+    </div>
+  </section>
+  {{end}}
+  {{else}}
+  <section class="hero" id="content" aria-label="Welcome">
     <div>
       <p class="eyebrow">The October movie challenge</p>
       <h1>31 nights.<br>A little <span class="hero-accent">fright.</span></h1>
       <p class="hero-copy">A month of old favorites, new nightmares, and one very good reason to stay in. Welcome to our October watchlist.</p>
-      {{if .Challenge}}<a class="button secondary" href="#challenge-heading">View the lineup <span aria-hidden="true">↓</span></a>{{end}}
+      <div class="actions">
+        {{if not .SignedIn}}<a class="button secondary" href="/login">Sign in to rate</a>{{end}}
+      </div>
     </div>
-    <div class="ticket" aria-hidden="true"><span class="ticket-top">OCTOBER · 01—31</span><span class="ticket-number">31</span><span class="section-label">Nights of fright<br>Admit the whole household</span></div>
+    <div class="ticket" aria-hidden="true">
+      <span class="ticket-top">Admit one · Oct {{.Year}}</span>
+      <span class="ticket-number">31</span>
+      <div class="ticket-tear"></div>
+      <span class="section-label">Nights of fright<br>Admit the whole household</span>
+    </div>
+  </section>
+  {{end}}
+  {{if .Challenge}}
+  <div class="stats" role="list" aria-label="{{.Challenge.Year}} challenge progress">
+    <div class="stat" role="listitem"><span class="stat-label">Challenge</span><span class="stat-value">{{.Challenge.Year}}</span></div>
+    <div class="stat" role="listitem"><span class="stat-label">Selected</span><span class="stat-value">{{len .Movies}}<small>/ 31</small></span></div>
+    <div class="stat" role="listitem"><span class="stat-label">Watched</span><span class="stat-value">{{.Watched}}<small>/ 31</small></span></div>
+    <div class="stat stat-progress" role="listitem"><label class="stat-label" for="challenge-progress">Progress</label><span class="stat-value">{{.Watched}}<small>of 31 nights</small></span><progress id="challenge-progress" value="{{.Watched}}" max="31">{{.Watched}} of 31 watched</progress></div>
   </div>
+  {{end}}
   {{if .Challenges}}
   <nav class="year-nav" aria-label="Challenge years">
-    <span class="section-label muted">Challenge year</span>
+    <span class="section-label">Challenge year</span>
     <ul>{{range .Challenges}}<li><a href="/challenges/{{.Year}}"{{if eq .Year $.Year}} aria-current="page"{{end}}>{{.Year}}</a></li>{{end}}</ul>
   </nav>
   {{end}}
   {{if .Challenge}}
-  <section aria-labelledby="challenge-heading">
+  <section class="lineup" aria-labelledby="challenge-heading">
     <div class="challenge-heading">
-      <div><p class="eyebrow">The lineup</p><h2 id="challenge-heading">{{.Challenge.Year}} movie challenge</h2><p>{{len .Movies}} of 31 movies selected · {{.Watched}} watched</p></div>
-      <div class="progress-block"><label for="challenge-progress">{{.Watched}} / 31 watched</label><progress id="challenge-progress" value="{{.Watched}}" max="31">{{.Watched}} of 31 watched</progress></div>
+      <div>
+        <p class="eyebrow">The lineup</p>
+        <h2 id="challenge-heading">{{.Challenge.Year}} movie challenge</h2>
+        <p class="challenge-meta">{{len .Movies}} of 31 movies selected · {{.Watched}} watched</p>
+      </div>
     </div>
     {{if .Movies}}
-    <section class="next-movie" aria-labelledby="next-movie-heading">
-      {{with .NextMovie}}
-      <p class="eyebrow">Up next{{if .Position.Valid}} · October {{printf "%02d" .Position.Int64}}{{else}} · Unscheduled{{end}}</p>
-      <h2 id="next-movie-heading">{{.Title}}</h2>
-      {{if .Overview.Valid}}<p class="overview">{{.Overview.String}}</p>{{end}}
-      <a class="button secondary" href="#movie-{{.ID}}">View movie details <span aria-hidden="true">↓</span></a>
-      {{else}}
-      <p class="eyebrow">All selected movies watched</p>
-      <h2 id="next-movie-heading">You’re all caught up.</h2>
-      <p>Every movie on this year’s list has been watched.</p>
-      {{end}}
-    </section>
     <ol class="watchlist" role="list">
       {{range .Movies}}
       <li{{if .Position.Valid}} value="{{.Position.Int64}}"{{end}}>
-        <article id="movie-{{.ID}}" class="movie-card{{if .WatchedAt.Valid}} is-watched{{end}}">
-          <div class="movie-meta"><span class="slot">{{if .Position.Valid}}October {{printf "%02d" .Position.Int64}}{{else}}Unscheduled{{end}}</span><span class="badge{{if .WatchedAt.Valid}} watched{{end}}">{{if .WatchedAt.Valid}}<span aria-hidden="true">✓ </span>Watched{{else}}Not watched yet{{end}}</span></div>
+        <article id="movie-{{.ID}}" class="movie-card{{if .WatchedAt.Valid}} is-watched{{end}}{{if and $.NextMovie (eq $.NextMovie.ID .ID)}} is-next{{end}}">
+          <div class="movie-meta">
+            <span class="slot">{{if .Position.Valid}}<span class="slot-day">{{printf "%02d" .Position.Int64}}</span><span class="slot-month">October</span>{{else}}<span class="slot-day" aria-hidden="true">—</span><span class="slot-month">Unscheduled</span>{{end}}</span>
+            {{if .WatchedAt.Valid}}<span class="badge watched">Seen</span>{{else if and $.NextMovie (eq $.NextMovie.ID .ID)}}<span class="badge next">Up next</span>{{else}}<span class="badge">Not watched yet</span>{{end}}
+          </div>
           <h3>{{.Title}}</h3>
           {{if .ReleaseDate.Valid}}<p class="release">Released {{.ReleaseDate.String}}</p>{{end}}
           {{if .Overview.Valid}}<details class="synopsis"><summary>Read synopsis</summary><p class="overview">{{.Overview.String}}</p></details>{{end}}
           {{if .Ratings}}
           <p class="rating">Household rating: {{.Average}} / 5 ({{len .Ratings}} {{if eq (len .Ratings) 1}}rating{{else}}ratings{{end}})</p>
-          <ul class="ratings" aria-label="Individual ratings">{{range .Ratings}}<li><span>{{.DisplayName}}: {{.Score}} / 5</span><span class="stars" aria-hidden="true">{{if ge .Score 1}}★{{else}}☆{{end}}{{if ge .Score 2}}★{{else}}☆{{end}}{{if ge .Score 3}}★{{else}}☆{{end}}{{if ge .Score 4}}★{{else}}☆{{end}}{{if ge .Score 5}}★{{else}}☆{{end}}</span></li>{{end}}</ul>
+          <ul class="ratings" aria-label="Individual ratings">{{range .Ratings}}<li><span>{{.DisplayName}}: {{.Score}} / 5</span>{{template "star_row" .}}</li>{{end}}</ul>
           {{else}}<p class="rating muted">No ratings yet.</p>{{end}}
           {{if $.SignedIn}}
           <form class="rating-form" method="post" action="/challenges/{{$.Year}}/movies/{{.ID}}/rating">
@@ -83,7 +155,7 @@
       {{end}}
     </ol>
     {{else}}
-    <div class="empty-state"><h2>The lineup is still in the making.</h2><p>No movies selected for this year yet.</p><p>Check back for our October picks.</p></div>
+    <div class="empty-state"><p class="eyebrow">Coming soon</p><h2>The lineup is still in the making.</h2><p>No movies selected for this year yet.</p><p>Check back for our October picks.</p></div>
     {{end}}
   </section>
   {{else}}

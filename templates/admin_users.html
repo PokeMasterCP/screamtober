@@ -1,69 +1,75 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  {{template "page_head"}}
   <title>Manage household · Screamtober</title>
   {{template "admin_style"}}
 </head>
 <body>
+{{template "admin_masthead"}}
 <main>
-  {{template "admin_masthead"}}
-  <header id="content">
-    <p class="eyebrow">Screamtober / Administration</p>
+  <header class="page-header" id="content">
+    <p class="eyebrow">Administration</p>
     <h1>Your household</h1>
-    <p>One owner. Three members. A whole month of movies.</p>
+    <p class="lede">One owner. Three members. A whole month of movies. Everyone here gets a personal token so they can rate what you watch together.</p>
     {{template "admin_nav" "household"}}
   </header>
   {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
   <div class="household-layout">
-  <section class="panel" aria-labelledby="create-heading">
-    <h2 id="create-heading">Add a person</h2>
-    {{if not .HasOwner}}<p>Start by creating your own owner profile and personal login token.</p>{{end}}
-    <p>Every personal token allows its person to rate movies. Sign out of admin before using a personal token.</p>
-    <form method="post" action="/admin/users">
-      <label for="display-name">Display name</label>
-      <input id="display-name" name="display_name" value="{{.Name}}" maxlength="80" required autocomplete="off">
-      <label for="role">Household role</label>
-      <select id="role" name="role" required>
-        {{if not .HasOwner}}<option value="owner"{{if eq .Role "owner"}} selected{{end}}>Owner — your personal profile</option>{{end}}
-        <option value="member"{{if eq .Role "member"}} selected{{end}}{{if ge .MemberCount 3}} disabled{{end}}>Member</option>
-      </select>
-      <button type="submit"{{if ge (len .Users) 4}} disabled{{end}}>Create person and token</button>
-    </form>
-    {{if ge (len .Users) 4}}<p class="muted">Your household is full. Disabled profiles still count toward the limit.</p>{{end}}
-  </section>
-  <section aria-labelledby="people-heading">
-    <h2 id="people-heading">People · {{len .Users}} / 4</h2>
-    {{if .Users}}
-    <ul class="profiles">
-      {{range .Users}}
-      <li class="profile">
-        <h3>{{.DisplayName}}</h3>
-        <p>{{if eq .Role "owner"}}Owner{{else}}Member{{end}} · {{if .DisabledAt.Valid}}Access disabled{{else if .HasToken}}Access enabled{{else}}Needs a token{{end}}</p>
-        <details class="profile-edit"><summary>Edit display name</summary>
-        <form class="rename" method="post" action="/admin/users/{{.ID}}/rename">
-          <label for="name-{{.ID}}">Display name for {{.DisplayName}}</label>
-          <input id="name-{{.ID}}" name="display_name" value="{{.DisplayName}}" maxlength="80" required autocomplete="off">
-          <button class="secondary" type="submit">Save name</button>
-        </form>
-        </details>
-        <div class="actions">
-          <form method="post" action="/admin/users/{{.ID}}/token">
-            <button type="submit">{{if .DisabledAt.Valid}}Create token and re-enable{{else if .HasToken}}Replace login token{{else}}Create login token{{end}}</button>
-          </form>
-          {{if not .DisabledAt.Valid}}
-          <form method="post" action="/admin/users/{{.ID}}/disable">
-            <button class="secondary danger" type="submit">Disable access</button>
-          </form>
-          {{end}}
-        </div>
-        <p class="muted">Replacing a token or disabling access signs this person out. Their ratings stay.</p>
-      </li>
-      {{end}}
-    </ul>
-    {{else}}<p>No profiles yet. Create your owner profile above.</p>{{end}}
-  </section>
+    <section class="panel" aria-labelledby="create-heading">
+      <p class="eyebrow">New profile</p>
+      <h2 id="create-heading">Add a person</h2>
+      {{if not .HasOwner}}<p>Start by creating your own owner profile and personal login token.</p>{{end}}
+      <p>Every personal token allows its person to rate movies. Sign out of admin before using a personal token.</p>
+      <form method="post" action="/admin/users">
+        <label for="display-name">Display name</label>
+        <input id="display-name" name="display_name" value="{{.Name}}" maxlength="80" required autocomplete="off" placeholder="e.g. Sam">
+        <label for="role">Household role</label>
+        <select id="role" name="role" required>
+          {{if not .HasOwner}}<option value="owner"{{if eq .Role "owner"}} selected{{end}}>Owner — your personal profile</option>{{end}}
+          <option value="member"{{if eq .Role "member"}} selected{{end}}{{if ge .MemberCount 3}} disabled{{end}}>Member</option>
+        </select>
+        <button type="submit"{{if ge (len .Users) 4}} disabled{{end}}>Create person and token</button>
+      </form>
+      {{if ge (len .Users) 4}}<p class="full-note">Your household is full. Disabled profiles still count toward the limit.</p>{{end}}
+    </section>
+    <section aria-labelledby="people-heading">
+      <div class="people-heading">
+        <h2 id="people-heading">People</h2>
+        <span class="count" aria-label="{{len .Users}} of 4 profiles"><b>{{len .Users}}</b> / 4</span>
+      </div>
+      {{if .Users}}
+      <ul class="profiles">
+        {{range .Users}}
+        <li class="profile">
+          <div class="profile-head">
+            <h3>{{.DisplayName}}</h3>
+            <span class="status {{if .DisabledAt.Valid}}is-disabled{{else if .HasToken}}is-enabled{{else}}is-pending{{end}}">{{if .DisabledAt.Valid}}Access disabled{{else if .HasToken}}Access enabled{{else}}Needs a token{{end}}</span>
+          </div>
+          <p class="profile-role">{{if eq .Role "owner"}}Owner{{else}}Member{{end}}</p>
+          <details class="profile-edit"><summary>Edit display name</summary>
+            <form class="rename" method="post" action="/admin/users/{{.ID}}/rename">
+              <label for="name-{{.ID}}">Display name for {{.DisplayName}}</label>
+              <input id="name-{{.ID}}" name="display_name" value="{{.DisplayName}}" maxlength="80" required autocomplete="off">
+              <button class="secondary small" type="submit">Save name</button>
+            </form>
+          </details>
+          <div class="actions">
+            <form method="post" action="/admin/users/{{.ID}}/token">
+              <button type="submit">{{if .DisabledAt.Valid}}Create token and re-enable{{else if .HasToken}}Replace login token{{else}}Create login token{{end}}</button>
+            </form>
+            {{if not .DisabledAt.Valid}}
+            <form method="post" action="/admin/users/{{.ID}}/disable">
+              <button class="secondary danger" type="submit">Disable access</button>
+            </form>
+            {{end}}
+          </div>
+          <p class="help">Replacing a token or disabling access signs this person out. Their ratings stay.</p>
+        </li>
+        {{end}}
+      </ul>
+      {{else}}<div class="empty-state"><h2>Nobody here yet.</h2><p>No profiles yet. Create your owner profile to get started.</p></div>{{end}}
+    </section>
   </div>
   {{template "site_footer"}}
 </main>

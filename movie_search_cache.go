@@ -14,7 +14,7 @@ const maxCachedSearches = 128
 type cachedMovieSearch struct {
 	session [32]byte
 	query   string
-	movies  []tmdb.MovieSummary
+	results tmdb.SearchResults
 	expires time.Time
 }
 
@@ -25,7 +25,7 @@ type movieSearchCache struct {
 	entries map[string]cachedMovieSearch
 }
 
-func (c *movieSearchCache) put(session [32]byte, query string, movies []tmdb.MovieSummary) string {
+func (c *movieSearchCache) put(entry cachedMovieSearch) string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	now := time.Now()
@@ -48,8 +48,25 @@ func (c *movieSearchCache) put(session [32]byte, query string, movies []tmdb.Mov
 		delete(c.entries, oldest)
 	}
 	key := rand.Text()
-	c.entries[key] = cachedMovieSearch{session: session, query: query, movies: movies, expires: now.Add(searchCacheTTL)}
+	c.entries[key] = entry
 	return key
+}
+
+// find reuses a full upstream page without extending its original lifetime.
+func (c *movieSearchCache) find(session [32]byte, query string, page int) (cachedMovieSearch, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	now := time.Now()
+	for key, entry := range c.entries {
+		if !now.Before(entry.expires) {
+			delete(c.entries, key)
+			continue
+		}
+		if entry.session == session && entry.query == query && entry.results.Page == page {
+			return entry, true
+		}
+	}
+	return cachedMovieSearch{}, false
 }
 
 func (c *movieSearchCache) get(key string, session [32]byte) (cachedMovieSearch, bool) {

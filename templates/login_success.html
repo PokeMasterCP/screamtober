@@ -1,31 +1,34 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Signed in · Screamtober</title>
-    {{template "admin_style"}}
-  </head>
-  <body>
-    <a class="skip-link" href="#content">Skip to content</a>
-    <main class="auth-page">
-      <div class="masthead"><span class="brand">Screamtober</span><span class="masthead-note">Admit one</span></div>
-      <div class="auth-panel panel" id="content">
-        <p class="eyebrow">The household entrance</p>
-        <h1>Signed in</h1>
-        {{if .}}
-        <p>You are signed in as administrator.</p>
-        <p>What would you like to do?</p>
-        <nav class="actions" aria-label="Admin tasks">
-          <a class="button" href="/admin/movies/search">Search movies</a>
-          <a class="button secondary" href="/admin/users">Manage household</a>
-        </nav>
-        {{else}}
-        <p>You are signed in to Screamtober.</p>
-        <p><a class="button" href="/">Continue to the movie challenge</a></p>
-        {{end}}
-      </div>
-      {{template "site_footer"}}
-    </main>
-  </body>
+<head>
+  {{template "page_head"}}
+  <title>Signed in · Screamtober</title>
+  {{template "admin_style"}}
+</head>
+<body>
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand-group"><span class="brand">Screamtober</span>{{if .}}<span class="chip accent">Admin</span>{{end}}</div>
+    <span class="chip">Admit one</span>
+  </div>
+</header>
+<main class="auth-page">
+  <div class="auth-panel panel" id="content">
+    <p class="eyebrow">The household entrance</p>
+    <h1>Signed in</h1>
+    {{if .}}
+    <p>You are signed in as administrator. Sign out of the admin panel before using a personal token in this browser.</p>
+    <nav class="actions" aria-label="Admin tasks">
+      <a class="button" href="/admin/movies/search">Search movies</a>
+      <a class="button secondary" href="/admin/users">Manage household</a>
+    </nav>
+    {{else}}
+    <p>Welcome back. Your ratings are ready whenever the credits roll.</p>
+    <nav class="actions" aria-label="Continue"><a class="button" href="/">Continue to the movie challenge</a></nav>
+    {{end}}
+  </div>
+  {{template "site_footer"}}
+</main>
+</body>
 </html>
