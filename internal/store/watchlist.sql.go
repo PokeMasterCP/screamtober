@@ -10,33 +10,6 @@ import (
 	"database/sql"
 )
 
-const addChallengeMovie = `-- name: AddChallengeMovie :one
-INSERT INTO challenge_movies (challenge_id, movie_id, position)
-VALUES (?, ?, ?)
-RETURNING id, challenge_id, movie_id, position, watched_at, submission_key, viewing_service
-`
-
-type AddChallengeMovieParams struct {
-	ChallengeID int64
-	MovieID     int64
-	Position    sql.NullInt64
-}
-
-func (q *Queries) AddChallengeMovie(ctx context.Context, arg AddChallengeMovieParams) (ChallengeMovie, error) {
-	row := q.db.QueryRowContext(ctx, addChallengeMovie, arg.ChallengeID, arg.MovieID, arg.Position)
-	var i ChallengeMovie
-	err := row.Scan(
-		&i.ID,
-		&i.ChallengeID,
-		&i.MovieID,
-		&i.Position,
-		&i.WatchedAt,
-		&i.SubmissionKey,
-		&i.ViewingService,
-	)
-	return i, err
-}
-
 const addUnscheduledMovie = `-- name: AddUnscheduledMovie :one
 INSERT INTO challenge_movies (challenge_id, movie_id, submission_key, viewing_service)
 VALUES (?, ?, ?, ?)
@@ -108,32 +81,6 @@ func (q *Queries) DeleteChallengeMovie(ctx context.Context, arg DeleteChallengeM
 		return 0, err
 	}
 	return result.RowsAffected()
-}
-
-const getChallengeMovie = `-- name: GetChallengeMovie :one
-SELECT id, challenge_id, movie_id, position, watched_at, submission_key, viewing_service FROM challenge_movies
-WHERE id = ? AND challenge_id = ?
-`
-
-type GetChallengeMovieParams struct {
-	ID          int64
-	ChallengeID int64
-}
-
-// Both identifiers scope the lookup to one challenge entry.
-func (q *Queries) GetChallengeMovie(ctx context.Context, arg GetChallengeMovieParams) (ChallengeMovie, error) {
-	row := q.db.QueryRowContext(ctx, getChallengeMovie, arg.ID, arg.ChallengeID)
-	var i ChallengeMovie
-	err := row.Scan(
-		&i.ID,
-		&i.ChallengeID,
-		&i.MovieID,
-		&i.Position,
-		&i.WatchedAt,
-		&i.SubmissionKey,
-		&i.ViewingService,
-	)
-	return i, err
 }
 
 const getEntryBySubmission = `-- name: GetEntryBySubmission :one
@@ -213,6 +160,26 @@ func (q *Queries) ListChallengeMovies(ctx context.Context, challengeID int64) ([
 	return items, nil
 }
 
+const markChallengeMovieWatched = `-- name: MarkChallengeMovieWatched :execrows
+UPDATE challenge_movies
+SET watched_at = COALESCE(watched_at, CURRENT_TIMESTAMP)
+WHERE id = ?1 AND challenge_id = ?2
+`
+
+type MarkChallengeMovieWatchedParams struct {
+	ID          int64
+	ChallengeID int64
+}
+
+// Preserve the first watched timestamp when another rating is submitted or edited.
+func (q *Queries) MarkChallengeMovieWatched(ctx context.Context, arg MarkChallengeMovieWatchedParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, markChallengeMovieWatched, arg.ID, arg.ChallengeID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const setChallengeMovieViewingService = `-- name: SetChallengeMovieViewingService :execrows
 UPDATE challenge_movies
 SET viewing_service = ?1
@@ -233,35 +200,6 @@ func (q *Queries) SetChallengeMovieViewingService(ctx context.Context, arg SetCh
 		return 0, err
 	}
 	return result.RowsAffected()
-}
-
-const setChallengeMovieWatchedAt = `-- name: SetChallengeMovieWatchedAt :one
-UPDATE challenge_movies
-SET watched_at = ?1
-WHERE id = ?2 AND challenge_id = ?3
-RETURNING id, challenge_id, movie_id, position, watched_at, submission_key, viewing_service
-`
-
-type SetChallengeMovieWatchedAtParams struct {
-	WatchedAt   sql.NullString
-	ID          int64
-	ChallengeID int64
-}
-
-// Pass NULL to mark an entry unwatched. Both identifiers scope the update.
-func (q *Queries) SetChallengeMovieWatchedAt(ctx context.Context, arg SetChallengeMovieWatchedAtParams) (ChallengeMovie, error) {
-	row := q.db.QueryRowContext(ctx, setChallengeMovieWatchedAt, arg.WatchedAt, arg.ID, arg.ChallengeID)
-	var i ChallengeMovie
-	err := row.Scan(
-		&i.ID,
-		&i.ChallengeID,
-		&i.MovieID,
-		&i.Position,
-		&i.WatchedAt,
-		&i.SubmissionKey,
-		&i.ViewingService,
-	)
-	return i, err
 }
 
 const setChallengePosition = `-- name: SetChallengePosition :execrows

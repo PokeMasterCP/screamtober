@@ -1,15 +1,12 @@
 package main
 
 import (
-	"bytes"
-	"context"
 	"crypto/sha256"
 	"database/sql"
 	"errors"
 	"html/template"
 	"log/slog"
 	"net/http"
-	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -66,14 +63,7 @@ func (h *adminHandler) showUsers(w http.ResponseWriter, r *http.Request, status 
 func (h *adminHandler) render(w http.ResponseWriter, r *http.Request, name string, status int, data any) {
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Referrer-Policy", "no-referrer")
-	var body bytes.Buffer
-	if err := h.pages.ExecuteTemplate(&body, name, data); err != nil {
-		h.fail(w, r, "render admin page", err)
-		return
-	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.WriteHeader(status)
-	_, _ = body.WriteTo(w)
+	renderPage(w, r, h.pages, name, status, data)
 }
 
 func (h *adminHandler) parseForm(w http.ResponseWriter, r *http.Request) bool {
@@ -101,7 +91,7 @@ func (h *adminHandler) createUser(w http.ResponseWriter, r *http.Request) {
 	token := newLoginToken()
 	hash := sha256.Sum256([]byte(token))
 	var user store.User
-	err := h.transaction(r.Context(), func(q *store.Queries) error {
+	err := withTransaction(r.Context(), h.db, func(q *store.Queries) error {
 		var err error
 		user, err = q.CreateUser(r.Context(), store.CreateUserParams{DisplayName: name, Role: role})
 		if err != nil {
@@ -122,18 +112,8 @@ func (h *adminHandler) createUser(w http.ResponseWriter, r *http.Request) {
 	h.render(w, r, "admin_token.html", http.StatusCreated, issuedTokenPage{Name: user.DisplayName, Token: token})
 }
 
-func adminUserID(w http.ResponseWriter, r *http.Request) (int64, bool) {
-	value := r.PathValue("id")
-	id, err := strconv.ParseInt(value, 10, 64)
-	if err != nil || id <= 0 || strconv.FormatInt(id, 10) != value {
-		http.NotFound(w, r)
-		return 0, false
-	}
-	return id, true
-}
-
 func (h *adminHandler) renameUser(w http.ResponseWriter, r *http.Request) {
-	id, ok := adminUserID(w, r)
+	id, ok := pathID(w, r)
 	if !ok || !h.parseForm(w, r) {
 		return
 	}
@@ -152,14 +132,14 @@ func (h *adminHandler) renameUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *adminHandler) replaceToken(w http.ResponseWriter, r *http.Request) {
-	id, ok := adminUserID(w, r)
+	id, ok := pathID(w, r)
 	if !ok {
 		return
 	}
 	token := newLoginToken()
 	hash := sha256.Sum256([]byte(token))
 	var user store.User
-	err := h.transaction(r.Context(), func(q *store.Queries) error {
+	err := withTransaction(r.Context(), h.db, func(q *store.Queries) error {
 		var err error
 		user, err = q.EnableUser(r.Context(), id)
 		if err != nil {
@@ -177,11 +157,11 @@ func (h *adminHandler) replaceToken(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *adminHandler) disableUser(w http.ResponseWriter, r *http.Request) {
-	id, ok := adminUserID(w, r)
+	id, ok := pathID(w, r)
 	if !ok {
 		return
 	}
-	err := h.transaction(r.Context(), func(q *store.Queries) error {
+	err := withTransaction(r.Context(), h.db, func(q *store.Queries) error {
 		if _, err := q.DisableUser(r.Context(), id); err != nil {
 			return err
 		}
@@ -194,18 +174,6 @@ func (h *adminHandler) disableUser(w http.ResponseWriter, r *http.Request) {
 	h.auth.revokeUserSessions(id)
 	setRequestEvent(r, slog.LevelInfo, "user disabled", "user_id", id)
 	http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
-}
-
-func (h *adminHandler) transaction(ctx context.Context, fn func(*store.Queries) error) error {
-	tx, err := h.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	if err := fn(h.queries.WithTx(tx)); err != nil {
-		return err
-	}
-	return tx.Commit()
 }
 
 func (h *adminHandler) writeFailure(w http.ResponseWriter, r *http.Request, operation string, err error) {

@@ -39,8 +39,8 @@ func calendarYear(w http.ResponseWriter, r *http.Request) (int64, bool) {
 	if raw == "" {
 		return int64(time.Now().Year()), true
 	}
-	year, err := strconv.ParseInt(raw, 10, 64)
-	if err != nil || year < 1 || year > 9999 {
+	year, ok := parseYear(raw)
+	if !ok {
 		http.Error(w, "Choose a year between 1 and 9999.", http.StatusBadRequest)
 		return 0, false
 	}
@@ -95,7 +95,7 @@ func (h *adminHandler) saveCalendar(w http.ResponseWriter, r *http.Request) {
 		h.showCalendar(w, r, year, 400, "The form could not be read. Please try again.")
 		return
 	}
-	err := h.transaction(r.Context(), func(q *store.Queries) error {
+	err := withTransaction(r.Context(), h.db, func(q *store.Queries) error {
 		challenge, err := q.GetChallengeByYear(r.Context(), year)
 		if err != nil {
 			return err

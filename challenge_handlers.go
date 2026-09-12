@@ -1,20 +1,19 @@
 package main
 
 import (
-	"bytes"
 	"database/sql"
 	"errors"
 	"fmt"
 	"html/template"
 	"log/slog"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/pokemastercp/screamtober/internal/store"
 )
 
 type challengeHandler struct {
+	db      *sql.DB
 	queries *store.Queries
 	auth    *auth
 	pages   *template.Template
@@ -64,10 +63,8 @@ func (h *challengeHandler) home(w http.ResponseWriter, r *http.Request) {
 
 func (h *challengeHandler) byYear(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
-	value := r.PathValue("year")
-	year, err := strconv.ParseInt(value, 10, 64)
-	if err != nil || strconv.FormatInt(year, 10) != value {
-		http.NotFound(w, r)
+	year, ok := pathYear(w, r)
+	if !ok {
 		return
 	}
 	challenge, err := h.queries.GetChallengeByYear(r.Context(), year)
@@ -138,16 +135,22 @@ func (h *challengeHandler) render(w http.ResponseWriter, r *http.Request, challe
 			data.Tonight = true
 		}
 	}
-	var body bytes.Buffer
-	if err := h.pages.ExecuteTemplate(&body, "home.html", data); err != nil {
-		h.fail(w, r, "render challenge", err)
-		return
-	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_, _ = body.WriteTo(w)
+	renderPage(w, r, h.pages, "home.html", http.StatusOK, data)
 }
 
 func (h *challengeHandler) fail(w http.ResponseWriter, r *http.Request, operation string, err error) {
 	setRequestEvent(r, slog.LevelError, "load challenge failed", "operation", operation, "error", err)
 	http.Error(w, "Unable to load challenge. Please try again later.", http.StatusInternalServerError)
 }
+
+type ratingPanel struct {
+	Movie              challengeMovieView
+	Year               int64
+	SignedIn, Featured bool
+}
+
+func (p challengePage) RatingPanel(movie challengeMovieView, featured bool) ratingPanel {
+	return ratingPanel{Movie: movie, Year: p.Year, SignedIn: p.SignedIn, Featured: featured}
+}
+
+func (ratingPanel) Scores() []int64 { return []int64{1, 2, 3, 4, 5} }

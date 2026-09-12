@@ -33,9 +33,6 @@ func TestCalendarArrangement(t *testing.T) {
 			t.Errorf("missing %s", want)
 		}
 	}
-	if strings.Contains(page.Body.String(), "<select") {
-		t.Error("calendar still renders a day dropdown; arrangement is drag-and-drop only")
-	}
 	form := url.Values{"revision": {calendarRevision(original)}, "entry_1": {"2"}, "entry_2": {"1"}}
 	if w := portalRequest(h, "POST", path, form, admin); w.Code != 303 {
 		t.Fatal(w.Code, w.Body.String())

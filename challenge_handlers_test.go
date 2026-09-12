@@ -117,7 +117,7 @@ func TestChallengeEscapingAndSignedInState(t *testing.T) {
 		if strings.Contains(body, "Sign out") != signedIn || strings.Contains(body, `href="/login"`) == signedIn {
 			t.Fatal("incorrect authentication controls")
 		}
-		// The temporary shared login grants no challenge mutation access.
+		// Personal sessions cannot write directly to challenge pages.
 		for _, method := range []string{http.MethodPost, http.MethodPut, http.MethodDelete} {
 			write := httptest.NewRequest(method, "/challenges/2026", nil)
 			if signedIn {
@@ -297,6 +297,33 @@ func TestChallengeSingleFeaturedMovie(t *testing.T) {
 		}
 		if strings.Contains(body, `id="challenge-carousel"`) || strings.Contains(body, "No movies selected for this year yet.") {
 			t.Fatal("single featured entry should not create an empty carousel or missing-movies message")
+		}
+	}
+}
+
+func TestCarouselPosterCards(t *testing.T) {
+	db := schemaFixture(t)
+	execSchema(t, db, `INSERT INTO movies(id,tmdb_id,title,overview,poster_path) VALUES(2,456,'<b>Carousel movie</b>','Carousel-only description','/carousel.jpg'); UPDATE challenge_movies SET movie_id=2 WHERE id=2`)
+	h := challengeHTTPFixture(t, db)
+	for _, cookie := range []*http.Cookie{nil, loginCookie(t, h)} {
+		body := authRequest(h, "GET", "/challenges/2026", "", cookie).Body.String()
+		start := strings.Index(body, `<article id="movie-2"`)
+		if start < 0 {
+			t.Fatal("carousel entry missing")
+		}
+		end := strings.Index(body[start:], "</article>")
+		if end < 0 {
+			t.Fatal("incomplete carousel card")
+		}
+		card := body[start : start+end]
+		if !strings.Contains(card, `aria-label="&lt;b&gt;Carousel movie&lt;/b&gt;"`) || !strings.Contains(card, `src="https://image.tmdb.org/t/p/w500/carousel.jpg"`) {
+			t.Fatal("poster or escaped accessible name missing")
+		}
+		if strings.Contains(card, "Carousel-only description") || strings.Contains(card, "<h3") {
+			t.Fatal("carousel must retain its poster-only presentation")
+		}
+		if strings.Contains(card, `action="/challenges/2026/movies/2/rating"`) != (cookie != nil) {
+			t.Fatal("wrong per-entry rating controls")
 		}
 	}
 }

@@ -64,7 +64,12 @@ func (h *movieSearchHandler) search(w http.ResponseWriter, r *http.Request) {
 	data := movieSearchPage{Query: strings.TrimSpace(r.URL.Query().Get("q"))}
 	data.Year = time.Now().Year()
 	if raw := r.URL.Query().Get("year"); raw != "" {
-		data.Year, _ = strconv.Atoi(raw)
+		year, ok := parseYear(raw)
+		if ok {
+			data.Year = int(year)
+		} else {
+			data.Year = 0
+		}
 	}
 	status := http.StatusOK
 	if data.Year >= 1 && data.Year <= 9999 {

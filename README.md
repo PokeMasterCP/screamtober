@@ -24,8 +24,8 @@ Year links let visitors browse earlier challenges. Pages read SQLite on each req
 and use cached movie metadata; no live TMDB API call is needed. The featured movie
 has a large poster, with the rest of the lineup in a horizontal carousel. Swipe,
 scroll, or use the arrow buttons to browse; keyboard users can focus the lineup
-and use arrow keys, Home, or End. Movie cards show posters and full descriptions,
-with equal-sized cards throughout the carousel. Swiping and scrolling also work
+and use arrow keys, Home, or End. Carousel cards use posters with ratings and
+viewing-service details; the featured movie also shows its title and description. Swiping and scrolling also work
 without JavaScript.
 Posters load from TMDB's image service; unavailable posters have a placeholder.
 Entries without votes show “No ratings yet.” Database failures return a generic
@@ -35,7 +35,10 @@ Sign in with your personal token to choose 1–5 whole stars on a movie card, th
 select **Save rating**. Your existing score is selected when you return; change it
 and select **Update rating** to edit your vote. Everyone can see individual scores
 and the household average. Each appearance of a movie has separate ratings, even
-within the same year. Administrator sessions cannot submit personal ratings.
+within the same year. Saving a rating marks that entry watched for the household
+and advances “Up next.” Later ratings and edits preserve its original watched time.
+Existing history is not rewritten on upgrade; this takes effect when a rating is saved.
+Administrator sessions cannot submit personal ratings.
 
 ## Setup
 
@@ -46,9 +49,8 @@ export ADMIN_TOKEN="$(openssl rand -hex 32)"
 ```
 
 Keep it in your password manager and reuse it between runs. For deployment, set it as
-an application runtime secret. **`ADMIN_TOKEN` replaces the old shared `AUTH_TOKEN`**;
-the old environment variable no longer grants access. Never share the administrator
-token with household members.
+an application runtime secret. Never share the administrator token with household
+members.
 
 ## TMDB movie lookup
 
@@ -56,40 +58,6 @@ Set **`TMDB_API_KEY`** to your TMDB **v3 API key**, available in your
 [TMDB API settings](https://www.themoviedb.org/settings/api). This is distinct
 from the API Read Access Token. Supply it through your shell environment or
 runtime secret configuration; do not commit the key to the repository.
-
-With that variable exported, retrieve a movie by its TMDB ID:
-
-```sh
-go run ./cmd/movie-info 11
-```
-
-The command prints JSON with the title, overview, release date, runtime in
-minutes, genres, and poster/backdrop paths. Unknown optional values may be null
-or empty. Image paths are TMDB-relative paths, not complete image URLs.
-It uses TMDB's [movie details endpoint](https://developer.themoviedb.org/reference/movie-details)
-and [API key authentication](https://developer.themoviedb.org/docs/authentication-application).
-
-Search by title using the same environment variable:
-
-```sh
-go run ./cmd/movie-search "Halloween"
-go run ./cmd/movie-search -year 1978 "Halloween"
-go run ./cmd/movie-search -page 2 "Halloween"
-```
-
-Put flags before the quoted title. The command uses TMDB's
-[movie search endpoint](https://developer.themoviedb.org/reference/search-movie)
-and returns JSON with matching titles, TMDB IDs, release dates, overviews, and
-poster paths, plus page and total counts. `-year` filters the primary release
-year. Searches exclude adult results and fetch one page at a time (default 1,
-maximum 500); an empty results array means no matches. Select an ID and use
-`movie-info` for full details. The client exposes this as
-`SearchMovies(ctx, title, tmdb.SearchOptions{Year: 1978})`.
-
-The reusable `internal/tmdb` client accepts a context and has a ten-second HTTP
-timeout. It reports missing configuration, invalid IDs, unavailable movies,
-rejected credentials, rate limits, and upstream failures without exposing the
-key or upstream error bodies. Requests are not automatically retried.
 
 Sign in as administrator and choose **Search movies**, or open
 `/admin/movies/search`. Choose a challenge year, search for a title, and select a result by title and
@@ -122,31 +90,15 @@ If another tab changes the lineup, reload and arrange the latest version.
 Set `TMDB_API_KEY` in the web server environment and restart the app. In Docker,
 add `-e TMDB_API_KEY` to either deployment command after exporting the variable.
 The web app still starts without the key and serves cached challenge data;
-search displays a configuration message until the key is supplied. The CLI
-commands remain local developer tools and are not bundled in the Docker image.
+search displays a configuration message until the key is supplied.
 
 ## Logging
 
-Logs are structured JSON. Prefer **one event per log record**: each HTTP request
-has one completion record containing its request ID, client IP, method, path,
-status, duration, and response size. Handlers enrich that record with the outcome
-or error instead of emitting a duplicate event. Startup and lifecycle events have
-their own records. Tokens, cookies, authorization headers, bodies, and query
-strings are excluded. Validated movie titles are intentionally logged separately
-as `search_term`. `LOG_LEVEL` accepts `debug`, `info` (default), `warn`, or
-`error`; records below that threshold are filtered.
-
-Movie searches use the stable message `movie search`, with `outcome` describing
-`success`, `invalid_query`, `not_configured`, `rate_limited`, or `upstream_failure`.
-Search attempts include the trimmed, validated `search_term` on success and
-upstream failure; invalid input is omitted. They omit a redundant `operation` field. Opening the form without submitting a
-query remains an ordinary `http request` event.
-
-Successful personal and administrator sign-ins return a 200 confirmation page
-with a continuation link, avoiding an automatic redirect GET. Following the link
-is a separate navigation request and is logged normally. Refreshing the
-confirmation page may prompt the browser to resubmit the form. Existing failed
-sign-in and other redirects retain their behavior.
+The app writes structured JSON logs to standard output. Use `docker logs screamtober`
+to inspect container logs. Set `LOG_LEVEL` to `debug`, `info` (default), `warn`, or
+`error` to control verbosity. Failed requests include diagnostic information.
+Tokens, cookies, authorization headers, request bodies, and complete query strings
+are excluded. Validated movie search titles are recorded, so treat logs as private.
 
 ## Household onboarding
 
@@ -321,46 +273,6 @@ A database or migration failure prevents startup. Fresh databases include the
 movie catalog, yearly picks, ratings, and household access tables. Sign-in
 sessions remain in memory, so restarting signs everyone out.
 
-### Schema
-
-| Table | Purpose and constraints |
-| --- | --- |
-| `users` | Display name, owner/member label, and disabled status; at most one owner and three members |
-| `user_tokens` | One hashed personal login token per provisioned user |
-| `movies` | Shared catalog with a unique TMDB ID and nullable cached metadata |
-| `challenges` | One challenge per year |
-| `challenge_movies` | Ordered slots 1–31, unique within each challenge; shared `watched_at` |
-| `ratings` | One whole-star score from 1–5 per user per challenge entry |
-
-Watchlists can have fewer than 31 entries and can repeat a movie in separate slots.
-Each appearance has independent viewing status and ratings, including across years.
-Users may edit their own ratings; the rating upsert also updates `updated_at`.
-Aggregate scores are calculated from submitted ratings, excluding missing votes.
-Foreign keys reject deletion of referenced records to prevent implicit loss of history.
-Reordering must use a transaction that handles the unique slot constraint.
-
-Administration requires the runtime admin credential. Personal tokens identify
-rating authors, including the owner; visitors have read-only access. The schema
-does not authorize HTTP requests. The database allows an empty household for
-bootstrapping, with profiles and credentials created from the admin portal.
-
-Rolling back the initial schema deletes all application tables and their data.
-Use rollback only against disposable databases.
-
-For authoring and inspecting migrations, install the pinned Goose CLI:
-
-```sh
-go install github.com/pressly/goose/v3/cmd/goose@v3.28.0
-goose -dir migrations -s create add_movie_catalog sql
-goose -dir migrations sqlite3 ./data/screamtober.db status
-```
-
-Goose migrations use `-- +goose Up` and `-- +goose Down` sections. Never edit
-applied migrations now that production is live; add a new migration instead. Restart
-the local app (or rebuild the Docker image) to apply new migrations. Test rollback
-only against disposable databases. Goose [migration documentation](https://pressly.github.io/goose/documentation/cli-commands/)
-describes the CLI commands.
-
 ### Persistent storage and backups
 
 In both Docker modes, mount persistent storage at `/data`, writable by container
@@ -380,43 +292,7 @@ a SQLite-consistent method, such as SQLite's `.backup` command. Do not copy a
 live database file without its WAL state. Verify restoration to a separate
 database before relying on backups; backup scheduling is not configured here.
 
-## SQL queries
+## Development
 
-Install the pinned sqlc version, then regenerate from the repository root:
-
-```sh
-go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1
-go generate ./...
-```
-
-`sqlc.yaml` reads Goose migrations directly as its schema source, using sqlc's
-[migration support](https://docs.sqlc.dev/en/latest/howto/ddl.html). Edit SQL in
-`queries/`, regenerate, and commit the resulting `internal/store/` files alongside
-the SQL. Do not edit generated Go files. Docker builds use that generated code and
-do not need sqlc installed.
-
-The queries cover user records and credential management, cached movie upserts, challenges by year,
-ordered watchlists, shared watched status, and editable ratings. Movie upserts
-replace the cached metadata (including nullable fields) while retaining the movie
-ID. Rating upserts retain the rating ID and refresh its timestamp. Watch-status and
-rating writes require matching challenge and entry IDs; mismatches return
-`sql.ErrNoRows`. Rating averages can be calculated from the returned votes.
-
-Create a query handle with `store.New(db)` using the open `*sql.DB`, and pass the
-request context to each operation. For atomic changes, call `db.BeginTx`, use
-`queries.WithTx(tx)` for every operation, and commit or roll back the transaction.
-Queries do not begin transactions automatically.
-
-This is an internal data-access layer, not authorization. Go handlers must require
-an admin session before administration or watched-status writes and derive the
-rating user ID from the authenticated personal session. Never grant admin access
-based only on the household role stored in `users`.
-Calendar reordering clears and assigns positions in one transaction, retaining entry IDs.
-
-## Development checks
-
-```sh
-sqlc compile
-go test ./...
-go vet ./...
-```
+See [DEVELOPMENT.md](DEVELOPMENT.md) for SQL generation, migrations, logging
+conventions, and development checks.

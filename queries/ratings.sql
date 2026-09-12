@@ -10,10 +10,6 @@ ON CONFLICT (user_id, challenge_movie_id) DO UPDATE SET
     updated_at = CURRENT_TIMESTAMP
 RETURNING *;
 
--- name: GetUserRating :one
-SELECT * FROM ratings
-WHERE user_id = ? AND challenge_movie_id = ?;
-
 -- name: ListChallengeRatings :many
 SELECT r.id, r.user_id, r.challenge_movie_id, r.score, r.updated_at,
        u.display_name

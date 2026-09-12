@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/pokemastercp/screamtober/internal/store"
 	"github.com/pressly/goose/v3"
 	_ "modernc.org/sqlite"
 )
@@ -60,4 +61,16 @@ func openDatabase(ctx context.Context, path string) (*sql.DB, error) {
 		return nil, fmt.Errorf("migrate database: %w", err)
 	}
 	return db, nil
+}
+
+func withTransaction(ctx context.Context, db *sql.DB, fn func(*store.Queries) error) error {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err := fn(store.New(tx)); err != nil {
+		return err
+	}
+	return tx.Commit()
 }

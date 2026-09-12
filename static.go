@@ -7,10 +7,10 @@ import (
 )
 
 //go:embed static/fonts/*.ttf static/fonts/OFL.txt static/services/*
-var fontFiles embed.FS
+var assetFiles embed.FS
 
-func registerFontRoutes(mux *http.ServeMux) {
-	assets, _ := fontFiles.ReadDir("static/services")
+func registerAssetRoutes(mux *http.ServeMux) {
+	assets, _ := assetFiles.ReadDir("static/services")
 	for _, asset := range assets {
 		name := asset.Name()
 		if !strings.HasSuffix(name, ".svg") && !strings.HasSuffix(name, ".png") {
@@ -23,7 +23,7 @@ func registerFontRoutes(mux *http.ServeMux) {
 			} else {
 				w.Header().Set("Content-Type", "image/png")
 			}
-			http.ServeFileFS(w, r, fontFiles, "static/services/"+name)
+			http.ServeFileFS(w, r, assetFiles, "static/services/"+name)
 		})
 	}
 	// Exact routes expose only the bundled assets, without a directory listing.
@@ -39,7 +39,7 @@ func registerFontRoutes(mux *http.ServeMux) {
 			if name != "OFL.txt" {
 				w.Header().Set("Content-Type", "font/ttf")
 			}
-			http.ServeFileFS(w, r, fontFiles, "static/fonts/"+name)
+			http.ServeFileFS(w, r, assetFiles, "static/fonts/"+name)
 		})
 	}
 }

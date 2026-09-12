@@ -68,56 +68,6 @@ func (q *Queries) EnableUser(ctx context.Context, id int64) (User, error) {
 	return i, err
 }
 
-const getUser = `-- name: GetUser :one
-SELECT id, display_name, role, created_at, disabled_at FROM users WHERE id = ?
-`
-
-func (q *Queries) GetUser(ctx context.Context, id int64) (User, error) {
-	row := q.db.QueryRowContext(ctx, getUser, id)
-	var i User
-	err := row.Scan(
-		&i.ID,
-		&i.DisplayName,
-		&i.Role,
-		&i.CreatedAt,
-		&i.DisabledAt,
-	)
-	return i, err
-}
-
-const listUsers = `-- name: ListUsers :many
-SELECT id, display_name, role, created_at, disabled_at FROM users ORDER BY id
-`
-
-func (q *Queries) ListUsers(ctx context.Context) ([]User, error) {
-	rows, err := q.db.QueryContext(ctx, listUsers)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []User{}
-	for rows.Next() {
-		var i User
-		if err := rows.Scan(
-			&i.ID,
-			&i.DisplayName,
-			&i.Role,
-			&i.CreatedAt,
-			&i.DisabledAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const renameUser = `-- name: RenameUser :one
 UPDATE users SET display_name = ? WHERE id = ? RETURNING id, display_name, role, created_at, disabled_at
 `

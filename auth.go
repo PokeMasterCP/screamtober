@@ -35,6 +35,7 @@ type auth struct {
 	adminTokenHash [32]byte
 	insecureCookie bool
 	queries        *store.Queries
+	pages          *template.Template
 	mu             sync.Mutex
 	sessions       map[[32]byte]userSession
 	adminSessions  map[[32]byte]time.Time
@@ -228,10 +229,10 @@ func (a *auth) login(w http.ResponseWriter, r *http.Request) {
 		delete(a.adminSessions, old)
 	}
 	a.mu.Unlock()
-	a.clearAdminCookies(w)
+	a.clearCookie(w, adminSessionCookie)
 	a.setCookie(w, sessionCookie, "/", value, sessionLifetime, expiry)
 	setRequestEvent(r, slog.LevelInfo, "login successful", "user_id", user.ID)
-	loginSuccess(w, r, false)
+	a.loginSuccess(w, r, false)
 }
 
 func (a *auth) startAdminSession(w http.ResponseWriter, r *http.Request) {
@@ -257,12 +258,10 @@ func (a *auth) startAdminSession(w http.ResponseWriter, r *http.Request) {
 		delete(a.sessions, old)
 	}
 	a.mu.Unlock()
-	a.setCookie(w, sessionCookie, "/", "", -time.Second, time.Unix(1, 0))
-	// Expire the former /admin-scoped cookie when upgrading an existing browser.
-	a.setCookie(w, adminSessionCookie, "/admin", "", -time.Second, time.Unix(1, 0))
+	a.clearCookie(w, sessionCookie)
 	a.setCookie(w, adminSessionCookie, "/", value, adminSessionLifetime, expiry)
 	setRequestEvent(r, slog.LevelInfo, "admin login successful")
-	loginSuccess(w, r, true)
+	a.loginSuccess(w, r, true)
 }
 
 func (a *auth) setCookie(w http.ResponseWriter, name, path, value string, lifetime time.Duration, expiry time.Time) {
@@ -296,7 +295,7 @@ func (a *auth) logout(w http.ResponseWriter, r *http.Request) {
 		delete(a.sessions, key)
 		a.mu.Unlock()
 	}
-	a.setCookie(w, sessionCookie, "/", "", -time.Second, time.Unix(1, 0))
+	a.clearCookie(w, sessionCookie)
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
@@ -312,23 +311,17 @@ func (a *auth) adminLogout(w http.ResponseWriter, r *http.Request) {
 		delete(a.sessions, key)
 		a.mu.Unlock()
 	}
-	a.clearAdminCookies(w)
-	a.setCookie(w, sessionCookie, "/", "", -time.Second, time.Unix(1, 0))
+	a.clearCookie(w, adminSessionCookie)
+	a.clearCookie(w, sessionCookie)
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 
-func (a *auth) clearAdminCookies(w http.ResponseWriter) {
-	a.setCookie(w, adminSessionCookie, "/", "", -time.Second, time.Unix(1, 0))
-	a.setCookie(w, adminSessionCookie, "/admin", "", -time.Second, time.Unix(1, 0))
+func (a *auth) clearCookie(w http.ResponseWriter, name string) {
+	a.setCookie(w, name, "/", "", -time.Second, time.Unix(1, 0))
 }
 
 // A confirmation response completes sign-in without an automatic second request.
-var loginSuccessPage = template.Must(template.ParseFS(templateFiles, "templates/login_success.html", "templates/admin_style.html"))
-
-func loginSuccess(w http.ResponseWriter, r *http.Request, admin bool) {
+func (a *auth) loginSuccess(w http.ResponseWriter, r *http.Request, admin bool) {
 	w.Header().Set("Cache-Control", "no-store")
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := loginSuccessPage.ExecuteTemplate(w, "login_success.html", admin); err != nil {
-		setRequestEvent(r, slog.LevelError, "render login confirmation failed", "error", err)
-	}
+	renderPage(w, r, a.pages, "login_success.html", http.StatusOK, admin)
 }

@@ -2,20 +2,19 @@ package main
 
 import (
 	"database/sql"
+	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
-
-	"errors"
-	"fmt"
 	"time"
 )
 
 func (h *movieSearchHandler) add(w http.ResponseWriter, r *http.Request) {
 	data := movieSearchPage{Year: time.Now().Year()}
-	fail := func(status int, message, outcome string) {
+	fail := func(status int, message, outcome string, attrs ...any) {
 		data.Error = message
-		setRequestEvent(r, slog.LevelWarn, "add movie", "outcome", outcome)
+		setRequestEvent(r, slog.LevelWarn, "add movie", append([]any{"outcome", outcome}, attrs...)...)
 		h.render(w, r, status, data)
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 4096)
@@ -23,12 +22,12 @@ func (h *movieSearchHandler) add(w http.ResponseWriter, r *http.Request) {
 		fail(400, "The selection could not be read. Please search again.", "invalid_selection")
 		return
 	}
-	year, err := strconv.Atoi(r.PostForm.Get("year"))
-	if err != nil || year < 1 || year > 9999 {
+	year, validYear := parseYear(r.PostForm.Get("year"))
+	if !validYear {
 		fail(400, "Choose a year between 1 and 9999.", "invalid_year")
 		return
 	}
-	data.Year = year
+	data.Year = int(year)
 	service := r.PostForm.Get("viewing_service")
 	if len(r.PostForm["viewing_service"]) > 1 || !validViewingService(service) {
 		fail(400, "Choose a supported viewing service. Please search again.", "invalid_viewing_service")
@@ -50,13 +49,13 @@ func (h *movieSearchHandler) add(w http.ResponseWriter, r *http.Request) {
 		if movie.ID != id {
 			continue
 		}
-		duplicate, err := addYearlyMovie(r.Context(), h.admin.db, movie, year, r.PostForm.Get("search_reference"), service)
+		duplicate, err := addYearlyMovie(r.Context(), h.admin.db, movie, int(year), r.PostForm.Get("search_reference"), service)
 		if errors.Is(err, errYearFull) {
 			fail(409, "That year already has 31 movies. Choose another year or remove a pick before adding more.", "year_full")
 			return
 		}
 		if err != nil {
-			fail(500, "The movie could not be saved. Please try again.", "database_failure")
+			fail(500, "The movie could not be saved. Please try again.", "database_failure", "error", err)
 			return
 		}
 		outcome := "success"
@@ -74,7 +73,7 @@ func (h *movieSearchHandler) add(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *movieSearchHandler) updateService(w http.ResponseWriter, r *http.Request) {
-	year, entryID, ok := adminChallengeMovieIDs(w, r)
+	year, entryID, ok := challengeMovieIDs(w, r)
 	if !ok {
 		return
 	}
@@ -90,7 +89,7 @@ func (h *movieSearchHandler) updateService(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "Choose a supported viewing service. Please try again.", http.StatusBadRequest)
 		return
 	}
-	if err := setYearlyMovieService(r.Context(), h.admin.db, entryID, year, values[0]); err != nil {
+	if err := setYearlyMovieService(r.Context(), h.admin.db, entryID, int(year), values[0]); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			http.NotFound(w, r)
 			return
@@ -103,23 +102,12 @@ func (h *movieSearchHandler) updateService(w http.ResponseWriter, r *http.Reques
 	http.Redirect(w, r, fmt.Sprintf("/admin/movies/search?year=%d&updated=1", year), http.StatusSeeOther)
 }
 
-func adminChallengeMovieIDs(w http.ResponseWriter, r *http.Request) (int, int64, bool) {
-	yearValue, entryValue := r.PathValue("year"), r.PathValue("id")
-	year, yearErr := strconv.Atoi(yearValue)
-	entryID, entryErr := strconv.ParseInt(entryValue, 10, 64)
-	if yearErr != nil || year < 1 || year > 9999 || strconv.Itoa(year) != yearValue || entryErr != nil || entryID <= 0 || strconv.FormatInt(entryID, 10) != entryValue {
-		http.NotFound(w, r)
-		return 0, 0, false
-	}
-	return year, entryID, true
-}
-
 func (h *movieSearchHandler) delete(w http.ResponseWriter, r *http.Request) {
-	year, entryID, ok := adminChallengeMovieIDs(w, r)
+	year, entryID, ok := challengeMovieIDs(w, r)
 	if !ok {
 		return
 	}
-	if err := deleteYearlyMovie(r.Context(), h.admin.db, entryID, year); err != nil {
+	if err := deleteYearlyMovie(r.Context(), h.admin.db, entryID, int(year)); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			http.NotFound(w, r)
 			return

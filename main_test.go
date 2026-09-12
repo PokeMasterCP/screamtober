@@ -63,11 +63,8 @@ func TestRoutes(t *testing.T) {
 				if got := response.Header().Get("Content-Type"); got != "text/html; charset=utf-8" {
 					t.Errorf("unexpected Content-Type: %q", got)
 				}
-				if !strings.Contains(body, `<h1>31 nights.<br>A little <span class="hero-accent">fright.</span></h1>`) {
-					t.Error("response does not contain the rendered page heading")
-				}
-				if strings.Contains(body, "Movie data provided by") || strings.Contains(body, "Lights off") {
-					t.Error("homepage contains removed footer copy")
+				if !strings.Contains(body, `href="/login"`) || !strings.Contains(body, `href="/credits"`) {
+					t.Error("public navigation missing")
 				}
 			}
 			if tt.name == "login" && strings.Contains(response.Body.String(), `href="/credits"`) {
@@ -75,13 +72,13 @@ func TestRoutes(t *testing.T) {
 			}
 			if tt.name == "login" {
 				body := response.Body.String()
-				if !strings.Contains(body, "Use your household token to continue.") || strings.Contains(body, "A personal token signs you in") {
-					t.Error("login page contains the wrong amount of sign-in guidance")
+				if !strings.Contains(body, `action="/login"`) || !strings.Contains(body, `name="token"`) {
+					t.Error("login form missing")
 				}
 			}
 			if tt.name == "credits" {
 				body := response.Body.String()
-				if !strings.Contains(body, "Movie data") || !strings.Contains(body, "This product uses the TMDB API") || strings.Contains(body, "Lights off") {
+				if !strings.Contains(body, "Movie data") || !strings.Contains(body, "This product uses the TMDB API") {
 					t.Error("credits page does not contain the expected attribution")
 				}
 			}

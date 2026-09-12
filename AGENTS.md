@@ -24,7 +24,7 @@ The application supports one owner and up to three additional authenticated user
 ### Established product and access decisions
 
 - Watchlists may be incomplete, contain repeated movies, and have at most 31 entries per year.
-- Viewing progress is shared by the household. Administration, including watched status, requires an admin session.
+- Viewing progress is shared by the household. Saving a personal rating atomically marks that challenge entry watched, preserving its first watched timestamp on later saves. Other administration requires an admin session.
 - Ratings are whole stars from 1–5, editable by their author, and tied to each challenge entry. Average only submitted ratings.
 - `ADMIN_TOKEN` is a runtime secret for administrator access. It is never a personal rating credential.
 - The owner has a personal profile and token, just like members. The `owner` role is a household label; it does not grant administration through a personal session.
@@ -84,7 +84,7 @@ Use structured JSON with request ID, client IP, method, path, status, duration, 
 - Keep request handling, business rules, and database access separated where the existing design supports it; avoid unnecessary abstractions.
 - Use request contexts for database and external API operations, and bound external calls with timeouts.
 - Use escaped HTML templates for user-controlled and externally sourced text. Do not mark untrusted content as safe HTML.
-- Keep forms and navigation usable with semantic HTML, accessible labels, and clear validation feedback.
+- Keep forms and navigation usable with semantic HTML, accessible labels, and clear validation feedback. Calendar arrangement intentionally supports drag-and-drop only; carousel cards intentionally use posters without visible titles or descriptions.
 
 ### Database changes
 
