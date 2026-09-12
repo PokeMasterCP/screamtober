@@ -3,7 +3,7 @@
 <head>
   {{template "page_head"}}
   <title>{{if .Challenge}}{{.Challenge.Year}} · {{end}}{{.Title}}{{if .SignedIn}} · Signed in{{end}}</title>
-  {{template "admin_style"}}
+  {{template "site_style"}}
 </head>
 <body>
 <a class="skip-link" href="#content">Skip to content</a>
@@ -40,26 +40,7 @@
           <aside class="feature-aside" aria-label="Ratings for {{.Title}}">
             <div class="feature-rating">
               <p class="eyebrow">Household verdict</p>
-              {{if .Ratings}}
-              <p class="rating">Household rating: {{.Average}} / 5 ({{len .Ratings}} {{if eq (len .Ratings) 1}}rating{{else}}ratings{{end}})</p>
-              <ul class="ratings" aria-label="Individual ratings">{{range .Ratings}}<li><span>{{.DisplayName}}: {{.Score}} / 5</span>{{template "star_row" .}}</li>{{end}}</ul>
-              {{else}}<p class="rating muted">Nobody has rated this one yet.{{if not $.SignedIn}} Sign in to be the first.{{end}}</p>{{end}}
-              {{if $.SignedIn}}
-              <form class="rating-form" method="post" action="/challenges/{{$.Year}}/movies/{{.ID}}/rating">
-                <label for="feature-rating-{{.ID}}">Your rating</label>
-                <div class="rating-controls">
-                  <select id="feature-rating-{{.ID}}" name="score" required>
-                    <option value="" disabled{{if not .YourRating}} selected{{end}}>Choose stars</option>
-                    <option value="1"{{if eq .YourRating 1}} selected{{end}}>1 star</option>
-                    <option value="2"{{if eq .YourRating 2}} selected{{end}}>2 stars</option>
-                    <option value="3"{{if eq .YourRating 3}} selected{{end}}>3 stars</option>
-                    <option value="4"{{if eq .YourRating 4}} selected{{end}}>4 stars</option>
-                    <option value="5"{{if eq .YourRating 5}} selected{{end}}>5 stars</option>
-                  </select>
-                  <button type="submit">{{if .YourRating}}Update rating{{else}}Save rating{{end}}</button>
-                </div>
-              </form>
-              {{end}}
+              {{template "movie_ratings" ($.RatingPanel . true)}}
             </div>
           </aside>
         </div>
@@ -132,26 +113,7 @@
             </div>
             {{template "viewing_service" .}}
             <div class="movie-verdict">
-              {{if .Ratings}}
-              <p class="rating">Household rating: {{.Average}} / 5 ({{len .Ratings}} {{if eq (len .Ratings) 1}}rating{{else}}ratings{{end}})</p>
-              <ul class="ratings" aria-label="Individual ratings">{{range .Ratings}}<li><span>{{.DisplayName}}: {{.Score}} / 5</span>{{template "star_row" .}}</li>{{end}}</ul>
-              {{else}}<p class="rating muted">No ratings yet.</p>{{end}}
-              {{if $.SignedIn}}
-              <form class="rating-form" method="post" action="/challenges/{{$.Year}}/movies/{{.ID}}/rating">
-                <label for="rating-{{.ID}}">Your rating</label>
-                <div class="rating-controls">
-                  <select id="rating-{{.ID}}" name="score" required>
-                    <option value="" disabled{{if not .YourRating}} selected{{end}}>Choose stars</option>
-                    <option value="1"{{if eq .YourRating 1}} selected{{end}}>1 star</option>
-                    <option value="2"{{if eq .YourRating 2}} selected{{end}}>2 stars</option>
-                    <option value="3"{{if eq .YourRating 3}} selected{{end}}>3 stars</option>
-                    <option value="4"{{if eq .YourRating 4}} selected{{end}}>4 stars</option>
-                    <option value="5"{{if eq .YourRating 5}} selected{{end}}>5 stars</option>
-                  </select>
-                  <button type="submit">{{if .YourRating}}Update rating{{else}}Save rating{{end}}</button>
-                </div>
-              </form>
-              {{end}}
+              {{template "movie_ratings" ($.RatingPanel . false)}}
             </div>
           </div>
         </article>

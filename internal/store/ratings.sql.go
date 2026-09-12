@@ -9,29 +9,6 @@ import (
 	"context"
 )
 
-const getUserRating = `-- name: GetUserRating :one
-SELECT id, user_id, challenge_movie_id, score, updated_at FROM ratings
-WHERE user_id = ? AND challenge_movie_id = ?
-`
-
-type GetUserRatingParams struct {
-	UserID           int64
-	ChallengeMovieID int64
-}
-
-func (q *Queries) GetUserRating(ctx context.Context, arg GetUserRatingParams) (Rating, error) {
-	row := q.db.QueryRowContext(ctx, getUserRating, arg.UserID, arg.ChallengeMovieID)
-	var i Rating
-	err := row.Scan(
-		&i.ID,
-		&i.UserID,
-		&i.ChallengeMovieID,
-		&i.Score,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
 const listChallengeRatings = `-- name: ListChallengeRatings :many
 SELECT r.id, r.user_id, r.challenge_movie_id, r.score, r.updated_at,
        u.display_name

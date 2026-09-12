@@ -10,14 +10,14 @@ import (
 )
 
 func TestSearchMovies(t *testing.T) {
-	for _, options := range []SearchOptions{{}, {Year: 1978, Page: 2}} {
+	for _, options := range []SearchOptions{{}, {Page: 2}} {
 		client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
 			q := r.URL.Query()
-			page, year := "1", ""
+			page := "1"
 			if options.Page == 2 {
-				page, year = "2", "1978"
+				page = "2"
 			}
-			if r.Method != "GET" || r.URL.Path != "/3/search/movie" || q.Get("query") != "L'été & Halloween?" || q.Get("primary_release_year") != year || q.Get("page") != page || q.Get("include_adult") != "false" || q.Get("api_key") != "test-secret" || q.Get("language") != "en-US" {
+			if r.Method != "GET" || r.URL.Path != "/3/search/movie" || q.Get("query") != "L'été & Halloween?" || q.Has("primary_release_year") || q.Get("page") != page || q.Get("include_adult") != "false" || q.Get("api_key") != "test-secret" || q.Get("language") != "en-US" {
 				t.Error("unexpected search request")
 			}
 			fmt.Fprintf(w, `{"page":%s,"total_pages":2,"total_results":21,"results":[{"id":948,"title":"Halloween","release_date":"1978-10-24","poster_path":null},{"id":949,"title":"Another movie"}]}`, page)
@@ -72,7 +72,7 @@ func TestSearchMoviesValidation(t *testing.T) {
 		title   string
 		options SearchOptions
 	}{
-		{" \t", SearchOptions{}}, {"Movie", SearchOptions{Year: -1}}, {"Movie", SearchOptions{Year: 10000}}, {"Movie", SearchOptions{Page: -1}}, {"Movie", SearchOptions{Page: 501}},
+		{" \t", SearchOptions{}}, {"Movie", SearchOptions{Page: -1}}, {"Movie", SearchOptions{Page: 501}},
 	} {
 		if _, err := client.SearchMovies(context.Background(), tt.title, tt.options); !errors.Is(err, ErrInvalidSearch) {
 			t.Fatalf("error = %v", err)

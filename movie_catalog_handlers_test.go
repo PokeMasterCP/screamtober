@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -144,7 +147,11 @@ func TestUpdateViewingServiceAndDeleteMovie(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	entry, err := q.GetChallengeMovie(context.Background(), store.GetChallengeMovieParams{ID: 1, ChallengeID: challenge.ID})
+	entries, err := q.ListChallengeMovies(context.Background(), challenge.ID)
+	if err != nil || len(entries) == 0 {
+		t.Fatalf("entries = %+v, %v", entries, err)
+	}
+	entry := entries[0]
 	if err != nil || entry.MovieID != 1 || entry.Position.Int64 != 1 || !entry.WatchedAt.Valid || entry.ViewingService != "netflix" {
 		t.Fatalf("service update changed the movie entry = %+v, error = %v", entry, err)
 	}
@@ -162,8 +169,8 @@ func TestUpdateViewingServiceAndDeleteMovie(t *testing.T) {
 	if w := portalRequest(h, "POST", "/admin/challenges/2026/movies/2/delete", nil, admin); w.Code != http.StatusSeeOther || w.Header().Get("Location") != "/admin/movies/search?year=2026&deleted=1" {
 		t.Fatalf("delete response = %d %q", w.Code, w.Header().Get("Location"))
 	}
-	if _, err := q.GetChallengeMovie(context.Background(), store.GetChallengeMovieParams{ID: 2, ChallengeID: challenge.ID}); !errors.Is(err, sql.ErrNoRows) {
-		t.Fatalf("deleted entry still exists: %v", err)
+	if err := db.QueryRow(`SELECT count(*) FROM challenge_movies WHERE id=2`).Scan(&count); err != nil || count != 0 {
+		t.Fatalf("deleted entry still exists: %d, %v", count, err)
 	}
 	if err := db.QueryRow(`SELECT count(*) FROM ratings WHERE challenge_movie_id = 2`).Scan(&count); err != nil || count != 0 {
 		t.Fatalf("deleted ratings = %d, error = %v", count, err)
@@ -280,5 +287,35 @@ func TestMovieSearchPageCacheExpiry(t *testing.T) {
 	}
 	if _, ok := cache.find(session, "Movie", 1); ok {
 		t.Fatal("expired page was reused")
+	}
+}
+
+func TestAddMovieDatabaseFailureLog(t *testing.T) {
+	db := schemaFixture(t)
+	a, _ := portalFixture(t, db)
+	stub := &searchStub{result: tmdb.SearchResults{Page: 1, TotalPages: 1, Results: []tmdb.MovieSummary{{ID: 456, Title: "New movie"}}}}
+	h, err := newHandlerWithMovieSearch(a, db, stub)
+	if err != nil {
+		t.Fatal(err)
+	}
+	admin := adminCookie(t, h)
+	page := portalRequest(h, "GET", "/admin/movies/search?q=New&year=2026", nil, admin)
+	ref := regexp.MustCompile(`name="search_reference" value="([^"]+)"`).FindStringSubmatch(page.Body.String())
+	if len(ref) != 2 {
+		t.Fatal("search reference missing")
+	}
+	execSchema(t, db, `CREATE TRIGGER reject_catalog BEFORE INSERT ON movies BEGIN SELECT RAISE(ABORT,'catalog write failed'); END`)
+	var logs bytes.Buffer
+	logger, _ := newLogger(&logs, "info")
+	w := portalRequest(requestLogging(logger, h), "POST", "/admin/movies", url.Values{"year": {"2026"}, "movie_id": {"456"}, "search_reference": {ref[1]}}, admin)
+	if w.Code != 500 || strings.Contains(w.Body.String(), "catalog write failed") {
+		t.Fatalf("response = %d %s", w.Code, w.Body.String())
+	}
+	var event map[string]any
+	if err := json.Unmarshal(bytes.TrimSpace(logs.Bytes()), &event); err != nil {
+		t.Fatalf("expected one completion event: %s", logs.String())
+	}
+	if event["outcome"] != "database_failure" || event["level"] != "error" || !strings.Contains(fmt.Sprint(event["error"]), "catalog write failed") {
+		t.Fatalf("missing diagnostic: %v", event)
 	}
 }

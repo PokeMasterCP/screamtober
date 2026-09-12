@@ -209,8 +209,10 @@ func TestAdminRoutesRequireAdminAndSameOrigin(t *testing.T) {
 			}
 		}
 	}
-	user, err := store.New(db).GetUser(context.Background(), 2)
-	if err != nil || user.DisplayName != "Member" || user.DisabledAt.Valid {
+	var name string
+	var disabled sql.NullString
+	err := db.QueryRow(`SELECT display_name, disabled_at FROM users WHERE id=2`).Scan(&name, &disabled)
+	if err != nil || name != "Member" || disabled.Valid {
 		t.Fatal("rejected requests changed account data")
 	}
 	if w := portalRequest(h, "GET", "/test/protected", nil, personal); w.Code != 200 {
@@ -349,8 +351,9 @@ func TestPortalTransactionsRollbackOnCredentialFailure(t *testing.T) {
 			t.Fatalf("failed transaction %s = %d %s", path, w.Code, w.Body.String())
 		}
 	}
-	users, err := store.New(db).ListUsers(context.Background())
-	if err != nil || len(users) != 2 || users[1].DisabledAt.Valid {
+	var count, disabled int
+	err := db.QueryRow(`SELECT count(*), count(disabled_at) FROM users`).Scan(&count, &disabled)
+	if err != nil || count != 2 || disabled != 0 {
 		t.Fatal("credential failure left a partial account mutation")
 	}
 	execSchema(t, db, `ALTER TABLE unavailable_user_tokens RENAME TO user_tokens`)

@@ -9,38 +9,18 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"time"
 )
 
 var (
 	ErrNotConfigured   = errors.New("TMDB_API_KEY is required for movie lookups")
-	ErrInvalidID       = errors.New("TMDB movie ID must be a positive 32-bit integer")
 	ErrNotFound        = errors.New("TMDB movie not found")
 	ErrUnauthorized    = errors.New("TMDB rejected the API key")
 	ErrRateLimited     = errors.New("TMDB rate limit reached; try again later")
 	ErrUnavailable     = errors.New("TMDB request failed")
 	ErrInvalidResponse = errors.New("TMDB returned invalid movie data")
 )
-
-// Movie contains the basic details returned by TMDB. Optional fields remain nil
-// when absent or null; an unknown release date may also be an empty string.
-type Movie struct {
-	ID           int64   `json:"id"`
-	Title        string  `json:"title"`
-	Overview     *string `json:"overview"`
-	ReleaseDate  *string `json:"release_date"`
-	Runtime      *int    `json:"runtime"`
-	PosterPath   *string `json:"poster_path"`
-	BackdropPath *string `json:"backdrop_path"`
-	Genres       []Genre `json:"genres"`
-}
-
-type Genre struct {
-	ID   int64  `json:"id"`
-	Name string `json:"name"`
-}
 
 type Client struct {
 	apiKey     string
@@ -60,22 +40,6 @@ func New(apiKey string) *Client {
 			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 		},
 	}
-}
-
-// GetMovie fetches one movie in English. It does not retry automatically.
-// Errors never include request URLs, credentials, or upstream response bodies.
-func (c *Client) GetMovie(ctx context.Context, id int64) (Movie, error) {
-	if id <= 0 || id > 1<<31-1 {
-		return Movie{}, ErrInvalidID
-	}
-	var movie Movie
-	if err := c.get(ctx, "/movie/"+strconv.FormatInt(id, 10), url.Values{}, &movie); err != nil {
-		return Movie{}, err
-	}
-	if movie.ID != id || strings.TrimSpace(movie.Title) == "" {
-		return Movie{}, ErrInvalidResponse
-	}
-	return movie, nil
 }
 
 // get shares bounded HTTP requests and sanitized errors across TMDB endpoints.

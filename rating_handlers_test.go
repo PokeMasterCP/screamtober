@@ -78,6 +78,10 @@ func TestRatingRejectsInvalidInput(t *testing.T) {
 			t.Errorf("%s = %d", path, w.Code)
 		}
 	}
+	var watchedCount int
+	if err := db.QueryRow(`SELECT count(*) FROM challenge_movies WHERE watched_at IS NOT NULL`).Scan(&watchedCount); err != nil || watchedCount != 0 {
+		t.Fatalf("rejected request changed watched status: %d, %v", watchedCount, err)
+	}
 	var score int
 	if err := db.QueryRow(`SELECT score FROM ratings WHERE user_id=2 AND challenge_movie_id=1`).Scan(&score); err != nil || score != 5 {
 		t.Fatal("invalid request changed rating")
@@ -125,6 +129,10 @@ func TestRatingAuthorizationAndCSRF(t *testing.T) {
 			if w.Code != want {
 				t.Fatalf("status = %d, want %d: %s", w.Code, want, w.Body.String())
 			}
+			var watchedCount int
+			if err := db.QueryRow(`SELECT count(*) FROM challenge_movies WHERE watched_at IS NOT NULL`).Scan(&watchedCount); err != nil || watchedCount != 0 {
+				t.Fatalf("rejected request changed watched status: %d, %v", watchedCount, err)
+			}
 			var score int
 			if err := db.QueryRow(`SELECT score FROM ratings WHERE user_id=2 AND challenge_movie_id=1`).Scan(&score); err != nil || score != 5 {
 				t.Fatal("unauthorized write")
@@ -150,5 +158,67 @@ func TestRatingDatabaseFailure(t *testing.T) {
 	var event map[string]any
 	if err := json.Unmarshal(bytes.TrimSpace(logs.Bytes()), &event); err != nil || event["message"] != "save rating" || event["error"] == nil {
 		t.Fatalf("missing single failure event: %s", logs.String())
+	}
+}
+
+func TestRatingMarksOnlyItsEntryWatched(t *testing.T) {
+	db := schemaFixture(t)
+	execSchema(t, db, `DELETE FROM ratings`)
+	h := challengeHTTPFixture(t, db)
+	member := loginCookie(t, h)
+	if w := ratingRequest(h, "/challenges/2026/movies/1/rating", "score=4", member); w.Code != 303 {
+		t.Fatal(w.Code, w.Body.String())
+	}
+	var watched string
+	if err := db.QueryRow(`SELECT watched_at FROM challenge_movies WHERE id=1`).Scan(&watched); err != nil || watched == "" {
+		t.Fatalf("watched time = %q, %v", watched, err)
+	}
+	var otherWatched int
+	if err := db.QueryRow(`SELECT count(*) FROM challenge_movies WHERE id != 1 AND watched_at IS NOT NULL`).Scan(&otherWatched); err != nil || otherWatched != 0 {
+		t.Fatalf("other entries changed: %d, %v", otherWatched, err)
+	}
+	page := authRequest(h, "GET", "/challenges/2026", "", member).Body.String()
+	if !strings.Contains(page, `class="feature-layout" id="movie-2"`) || !strings.Contains(page, "1 watched") {
+		t.Fatal("rating did not advance shared progress")
+	}
+	// Use a fixed historical value to prove edits and other authors do not replace it.
+	execSchema(t, db, `UPDATE challenge_movies SET watched_at='2026-10-01 20:00:00' WHERE id=1`)
+	setTestUserToken(t, db, 1, testToken+"owner")
+	owner := personalCookie(t, h, testToken+"owner")
+	for _, cookie := range []*http.Cookie{member, owner} {
+		if w := ratingRequest(h, "/challenges/2026/movies/1/rating", "score=5", cookie); w.Code != 303 {
+			t.Fatal(w.Code)
+		}
+		if err := db.QueryRow(`SELECT watched_at FROM challenge_movies WHERE id=1`).Scan(&watched); err != nil || watched != "2026-10-01 20:00:00" {
+			t.Fatalf("watched time replaced: %q, %v", watched, err)
+		}
+	}
+}
+
+func TestRatingAndWatchedStateRollbackTogether(t *testing.T) {
+	for _, operation := range []string{"rating", "watched"} {
+		t.Run(operation, func(t *testing.T) {
+			db := schemaFixture(t)
+			execSchema(t, db, `DELETE FROM ratings WHERE challenge_movie_id=1`)
+			if operation == "rating" {
+				execSchema(t, db, `CREATE TRIGGER reject_rating BEFORE INSERT ON ratings BEGIN SELECT RAISE(ABORT, 'rating rejected'); END`)
+			} else {
+				execSchema(t, db, `CREATE TRIGGER reject_watched BEFORE UPDATE OF watched_at ON challenge_movies BEGIN SELECT RAISE(ABORT, 'watched rejected'); END`)
+			}
+			h := challengeHTTPFixture(t, db)
+			if w := ratingRequest(h, "/challenges/2026/movies/1/rating", "score=4", loginCookie(t, h)); w.Code != 500 {
+				t.Fatal(w.Code)
+			}
+			var ratings, watched int
+			if err := db.QueryRow(`SELECT count(*) FROM ratings WHERE challenge_movie_id=1`).Scan(&ratings); err != nil {
+				t.Fatal(err)
+			}
+			if err := db.QueryRow(`SELECT count(*) FROM challenge_movies WHERE watched_at IS NOT NULL`).Scan(&watched); err != nil {
+				t.Fatal(err)
+			}
+			if ratings != 0 || watched != 0 {
+				t.Fatalf("partial save: %d ratings, %d watched", ratings, watched)
+			}
+		})
 	}
 }

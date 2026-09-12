@@ -19,43 +19,42 @@ func addYearlyMovie(ctx context.Context, db *sql.DB, movie tmdb.MovieSummary, ye
 	if !validViewingService(service) {
 		return false, errViewingService
 	}
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return false, err
-	}
-	defer tx.Rollback()
-	q := store.New(tx)
-	digest := sha256.Sum256([]byte(fmt.Sprintf("%s:%d:%d", reference, year, movie.ID)))
-	key := sql.NullString{String: fmt.Sprintf("%x", digest), Valid: true}
-	if _, err := q.GetEntryBySubmission(ctx, key); err == nil {
-		return true, nil
-	} else if !errors.Is(err, sql.ErrNoRows) {
-		return false, err
-	}
-	challenge, err := q.EnsureChallenge(ctx, int64(year))
-	if err != nil {
-		return false, err
-	}
-	count, err := q.CountChallengeMovies(ctx, challenge.ID)
-	if err != nil {
-		return false, err
-	}
-	if count >= 31 {
-		return false, errYearFull
-	}
-	_, err = q.AddMovieToCatalog(ctx, store.AddMovieToCatalogParams{TmdbID: movie.ID, Title: movie.Title, ReleaseDate: nullableMovieText(movie.ReleaseDate), PosterPath: nullableMovieText(movie.PosterPath), Overview: nullableMovieText(movie.Overview)})
-	if err != nil {
-		return false, err
-	}
-	cached, err := q.GetMovieByTMDBID(ctx, movie.ID)
-	if err != nil {
-		return false, err
-	}
-	_, err = q.AddUnscheduledMovie(ctx, store.AddUnscheduledMovieParams{ChallengeID: challenge.ID, MovieID: cached.ID, SubmissionKey: key, ViewingService: service})
-	if err != nil {
-		return false, err
-	}
-	return false, tx.Commit()
+	duplicate := false
+	err := withTransaction(ctx, db, func(q *store.Queries) error {
+		digest := sha256.Sum256([]byte(fmt.Sprintf("%s:%d:%d", reference, year, movie.ID)))
+		key := sql.NullString{String: fmt.Sprintf("%x", digest), Valid: true}
+		if _, err := q.GetEntryBySubmission(ctx, key); err == nil {
+			duplicate = true
+			return nil
+		} else if !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+		challenge, err := q.EnsureChallenge(ctx, int64(year))
+		if err != nil {
+			return err
+		}
+		count, err := q.CountChallengeMovies(ctx, challenge.ID)
+		if err != nil {
+			return err
+		}
+		if count >= 31 {
+			return errYearFull
+		}
+		_, err = q.AddMovieToCatalog(ctx, store.AddMovieToCatalogParams{TmdbID: movie.ID, Title: movie.Title, ReleaseDate: nullableMovieText(movie.ReleaseDate), PosterPath: nullableMovieText(movie.PosterPath), Overview: nullableMovieText(movie.Overview)})
+		if err != nil {
+			return err
+		}
+		cached, err := q.GetMovieByTMDBID(ctx, movie.ID)
+		if err != nil {
+			return err
+		}
+		_, err = q.AddUnscheduledMovie(ctx, store.AddUnscheduledMovieParams{ChallengeID: challenge.ID, MovieID: cached.ID, SubmissionKey: key, ViewingService: service})
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	return duplicate, err
 }
 
 // Update only the viewing service for one challenge entry. The movie, schedule,

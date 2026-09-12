@@ -6,21 +6,14 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strconv"
 
 	"github.com/pokemastercp/screamtober/internal/store"
 )
 
 func (h *challengeHandler) rate(w http.ResponseWriter, r *http.Request) {
 	user := r.Context().Value(authenticatedUserKey{}).(store.User)
-	year, err := strconv.ParseInt(r.PathValue("year"), 10, 64)
-	if err != nil || strconv.FormatInt(year, 10) != r.PathValue("year") {
-		http.NotFound(w, r)
-		return
-	}
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil || id < 1 || strconv.FormatInt(id, 10) != r.PathValue("id") {
-		http.NotFound(w, r)
+	year, id, ok := challengeMovieIDs(w, r)
+	if !ok {
 		return
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 4096)
@@ -47,8 +40,20 @@ func (h *challengeHandler) rate(w http.ResponseWriter, r *http.Request) {
 		fail(err)
 		return
 	}
-	_, err = h.queries.UpsertRating(r.Context(), store.UpsertRatingParams{
-		UserID: user.ID, Score: int64(values[0][0] - '0'), ChallengeMovieID: id, ChallengeID: challenge.ID,
+	err = withTransaction(r.Context(), h.db, func(q *store.Queries) error {
+		if _, err := q.UpsertRating(r.Context(), store.UpsertRatingParams{
+			UserID: user.ID, Score: int64(values[0][0] - '0'), ChallengeMovieID: id, ChallengeID: challenge.ID,
+		}); err != nil {
+			return err
+		}
+		count, err := q.MarkChallengeMovieWatched(r.Context(), store.MarkChallengeMovieWatchedParams{ID: id, ChallengeID: challenge.ID})
+		if err != nil {
+			return err
+		}
+		if count != 1 {
+			return sql.ErrNoRows
+		}
+		return nil
 	})
 	if errors.Is(err, sql.ErrNoRows) {
 		http.NotFound(w, r)

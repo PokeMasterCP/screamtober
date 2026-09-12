@@ -9,17 +9,6 @@ import (
 	"context"
 )
 
-const createChallenge = `-- name: CreateChallenge :one
-INSERT INTO challenges (year) VALUES (?) RETURNING id, year
-`
-
-func (q *Queries) CreateChallenge(ctx context.Context, year int64) (Challenge, error) {
-	row := q.db.QueryRowContext(ctx, createChallenge, year)
-	var i Challenge
-	err := row.Scan(&i.ID, &i.Year)
-	return i, err
-}
-
 const ensureChallenge = `-- name: EnsureChallenge :one
 INSERT INTO challenges (year) VALUES (?)
 ON CONFLICT (year) DO UPDATE SET year = excluded.year

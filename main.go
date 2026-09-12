@@ -28,6 +28,7 @@ func newHandlerWithMovieSearch(auth *auth, db *sql.DB, movies movieSearcher) (ht
 		return nil, err
 	}
 
+	auth.pages = pages
 	mux := http.NewServeMux()
 	admin := &adminHandler{db: db, queries: store.New(db), auth: auth, pages: pages}
 	mux.Handle("GET /admin/calendar", auth.requireAdmin(http.HandlerFunc(admin.calendar)))
@@ -49,28 +50,21 @@ func newHandlerWithMovieSearch(auth *auth, db *sql.DB, movies movieSearcher) (ht
 	mux.Handle("POST /admin/users/{id}/disable", auth.requireAdmin(http.HandlerFunc(admin.disableUser)))
 	mux.HandleFunc("GET /login", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		data := struct{ InvalidToken bool }{InvalidToken: r.URL.Query().Get("error") == "invalid"}
-		if err := pages.ExecuteTemplate(w, "login.html", data); err != nil {
-			setRequestEvent(r, slog.LevelError, "render login failed", "error", err)
-		}
+		renderPage(w, r, pages, "login.html", http.StatusOK, data)
 	})
 	mux.HandleFunc("POST /login", auth.login)
 	mux.HandleFunc("POST /logout", auth.logout)
 	mux.HandleFunc("GET /credits", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		if err := pages.ExecuteTemplate(w, "credits.html", nil); err != nil {
-			setRequestEvent(r, slog.LevelError, "render credits failed", "error", err)
-		}
+		renderPage(w, r, pages, "credits.html", http.StatusOK, nil)
 	})
-	challenges := &challengeHandler{queries: store.New(db), auth: auth, pages: pages}
+	challenges := &challengeHandler{db: db, queries: store.New(db), auth: auth, pages: pages}
 	mux.HandleFunc("GET /{$}", challenges.home)
 	mux.HandleFunc("GET /challenges/{year}", challenges.byYear)
 	mux.Handle("POST /challenges/{year}/movies/{id}/rating", auth.requireAuth(http.HandlerFunc(challenges.rate)))
-	// Public font files are shared by product and admin pages. Keep the session
-	// boundary around application routes, while allowing both to load fonts.
+	// Bundled assets are shared by product and admin pages.
 	root := http.NewServeMux()
-	registerFontRoutes(root)
+	registerAssetRoutes(root)
 	root.Handle("/", auth.restrictAdminSession(mux))
 	return http.NewCrossOriginProtection().Handler(root), nil
 }

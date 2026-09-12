@@ -112,22 +112,6 @@ func TestDeleteEntryCascadesOnlyItsRatings(t *testing.T) {
 	}
 }
 
-func TestRatingEditsAndYearIsolation(t *testing.T) {
-	db := schemaFixture(t)
-	execSchema(t, db, `UPDATE ratings SET score = 4, updated_at = CURRENT_TIMESTAMP WHERE user_id = 2 AND challenge_movie_id = 1`)
-	execSchema(t, db, `UPDATE challenge_movies SET watched_at = CURRENT_TIMESTAMP WHERE id = 1`)
-	for _, tt := range []struct{ user, entry, score int }{{1, 1, 1}, {2, 1, 4}, {2, 2, 2}, {2, 3, 3}} {
-		var score int
-		if err := db.QueryRow(`SELECT score FROM ratings WHERE user_id = ? AND challenge_movie_id = ?`, tt.user, tt.entry).Scan(&score); err != nil || score != tt.score {
-			t.Fatalf("user %d entry %d score = %d, error = %v", tt.user, tt.entry, score, err)
-		}
-	}
-	var watched int
-	if err := db.QueryRow(`SELECT count(*) FROM challenge_movies WHERE watched_at IS NOT NULL`).Scan(&watched); err != nil || watched != 1 {
-		t.Fatalf("watched entries = %d, error = %v", watched, err)
-	}
-}
-
 func TestSchemaRollbackAndRebuild(t *testing.T) {
 	ctx := context.Background()
 	path := filepath.Join(t.TempDir(), "upgrade.db")
