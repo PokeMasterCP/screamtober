@@ -11,6 +11,24 @@ JOIN movies AS m ON m.id = cm.movie_id
 WHERE cm.challenge_id = ?
 ORDER BY cm.position IS NULL, cm.position, cm.id;
 
+-- Both identifiers scope the lookup to one challenge entry.
+-- name: GetChallengeMovie :one
+SELECT * FROM challenge_movies
+WHERE id = ? AND challenge_id = ?;
+
+-- Scope the update to one entry in the requested year.
+-- name: SetChallengeMovieViewingService :execrows
+UPDATE challenge_movies
+SET viewing_service = sqlc.arg(viewing_service)
+WHERE challenge_movies.id = sqlc.arg(id)
+  AND challenge_movies.challenge_id = (SELECT challenges.id FROM challenges WHERE challenges.year = sqlc.arg(year));
+
+-- Delete only the requested year's entry; its ratings cascade automatically.
+-- name: DeleteChallengeMovie :execrows
+DELETE FROM challenge_movies
+WHERE challenge_movies.id = sqlc.arg(id)
+  AND challenge_movies.challenge_id = (SELECT challenges.id FROM challenges WHERE challenges.year = sqlc.arg(year));
+
 -- Pass NULL to mark an entry unwatched. Both identifiers scope the update.
 -- name: SetChallengeMovieWatchedAt :one
 UPDATE challenge_movies

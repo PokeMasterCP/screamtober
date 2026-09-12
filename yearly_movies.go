@@ -57,3 +57,34 @@ func addYearlyMovie(ctx context.Context, db *sql.DB, movie tmdb.MovieSummary, ye
 	}
 	return false, tx.Commit()
 }
+
+// Update only the viewing service for one challenge entry. The movie, schedule,
+// watched state, and ratings are intentionally left untouched.
+func setYearlyMovieService(ctx context.Context, db *sql.DB, entryID int64, year int, service string) error {
+	if !validViewingService(service) {
+		return errViewingService
+	}
+	updated, err := store.New(db).SetChallengeMovieViewingService(ctx, store.SetChallengeMovieViewingServiceParams{
+		ViewingService: service, ID: entryID, Year: int64(year),
+	})
+	if err != nil {
+		return err
+	}
+	if updated != 1 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
+// Deleting a pick intentionally removes only that year's entry and its ratings.
+// The catalog movie remains available to other challenge years and repeats.
+func deleteYearlyMovie(ctx context.Context, db *sql.DB, entryID int64, year int) error {
+	deleted, err := store.New(db).DeleteChallengeMovie(ctx, store.DeleteChallengeMovieParams{ID: entryID, Year: int64(year)})
+	if err != nil {
+		return err
+	}
+	if deleted != 1 {
+		return sql.ErrNoRows
+	}
+	return nil
+}

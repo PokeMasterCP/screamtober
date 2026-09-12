@@ -16,7 +16,7 @@ func (h *movieSearchHandler) add(w http.ResponseWriter, r *http.Request) {
 	fail := func(status int, message, outcome string) {
 		data.Error = message
 		setRequestEvent(r, slog.LevelWarn, "add movie", "outcome", outcome)
-		h.admin.render(w, r, "admin_movie_search.html", status, data)
+		h.render(w, r, status, data)
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 4096)
 	if err := r.ParseForm(); err != nil {
@@ -67,10 +67,69 @@ func (h *movieSearchHandler) add(w http.ResponseWriter, r *http.Request) {
 		}
 
 		setRequestEvent(r, slog.LevelInfo, "add movie", "outcome", outcome, "tmdb_id", id, "year", year)
-		h.admin.render(w, r, "admin_movie_search.html", http.StatusOK, data)
+		h.render(w, r, http.StatusOK, data)
 		return
 	}
 	fail(400, "Select a movie from the search results. Please search again.", "invalid_selection")
+}
+
+func (h *movieSearchHandler) updateService(w http.ResponseWriter, r *http.Request) {
+	year, entryID, ok := adminChallengeMovieIDs(w, r)
+	if !ok {
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 4096)
+	if err := r.ParseForm(); err != nil {
+		setRequestEvent(r, slog.LevelWarn, "update viewing service", "outcome", "invalid_form")
+		http.Error(w, "The viewing service could not be saved. Please try again.", http.StatusBadRequest)
+		return
+	}
+	values := r.PostForm["viewing_service"]
+	if len(values) != 1 || !validViewingService(values[0]) {
+		setRequestEvent(r, slog.LevelWarn, "update viewing service", "outcome", "invalid_viewing_service", "year", year, "entry_id", entryID)
+		http.Error(w, "Choose a supported viewing service. Please try again.", http.StatusBadRequest)
+		return
+	}
+	if err := setYearlyMovieService(r.Context(), h.admin.db, entryID, year, values[0]); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.NotFound(w, r)
+			return
+		}
+		setRequestEvent(r, slog.LevelError, "update viewing service failed", "error", err, "year", year, "entry_id", entryID)
+		http.Error(w, "The viewing service could not be saved. Please try again later.", http.StatusInternalServerError)
+		return
+	}
+	setRequestEvent(r, slog.LevelInfo, "update viewing service", "outcome", "success", "year", year, "entry_id", entryID)
+	http.Redirect(w, r, fmt.Sprintf("/admin/movies/search?year=%d&updated=1", year), http.StatusSeeOther)
+}
+
+func adminChallengeMovieIDs(w http.ResponseWriter, r *http.Request) (int, int64, bool) {
+	yearValue, entryValue := r.PathValue("year"), r.PathValue("id")
+	year, yearErr := strconv.Atoi(yearValue)
+	entryID, entryErr := strconv.ParseInt(entryValue, 10, 64)
+	if yearErr != nil || year < 1 || year > 9999 || strconv.Itoa(year) != yearValue || entryErr != nil || entryID <= 0 || strconv.FormatInt(entryID, 10) != entryValue {
+		http.NotFound(w, r)
+		return 0, 0, false
+	}
+	return year, entryID, true
+}
+
+func (h *movieSearchHandler) delete(w http.ResponseWriter, r *http.Request) {
+	year, entryID, ok := adminChallengeMovieIDs(w, r)
+	if !ok {
+		return
+	}
+	if err := deleteYearlyMovie(r.Context(), h.admin.db, entryID, year); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.NotFound(w, r)
+			return
+		}
+		setRequestEvent(r, slog.LevelError, "delete movie failed", "error", err, "year", year, "entry_id", entryID)
+		http.Error(w, "The movie could not be deleted. Please try again later.", http.StatusInternalServerError)
+		return
+	}
+	setRequestEvent(r, slog.LevelInfo, "delete movie", "outcome", "success", "year", year, "entry_id", entryID)
+	http.Redirect(w, r, fmt.Sprintf("/admin/movies/search?year=%d&deleted=1", year), http.StatusSeeOther)
 }
 
 func nullableMovieText(value *string) sql.NullString {
