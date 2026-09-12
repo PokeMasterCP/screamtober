@@ -243,6 +243,34 @@
   .admin-movie-search-page .toolbar-links { justify-content: center; }
 
   /* ---------- Movie search ---------- */
+  .current-picks { max-width: 68rem; margin: 0 auto 2.5rem; padding: 1.5rem; border: 1px solid var(--line); border-radius: var(--radius); background: linear-gradient(135deg, var(--blood-soft), transparent 45%), var(--surface); box-shadow: var(--shadow); }
+  .current-picks-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: .65rem; }
+  .current-picks-heading .eyebrow { margin-bottom: .35rem; }
+  .current-picks-heading h2 { margin: 0; }
+  .current-picks-heading .count { flex-shrink: 0; }
+  .current-picks-note { max-width: 52rem; margin: 0 0 1.25rem; color: var(--muted); font-size: .88rem; }
+  .current-pick-list { display: grid; gap: .65rem; padding: 0; margin: 0; list-style: none; }
+  .current-pick { display: grid; grid-template-columns: 3.25rem minmax(0, 1fr) auto; align-items: center; gap: .9rem; min-width: 0; padding: .65rem; border: 1px solid var(--line); border-radius: var(--radius-sm); background: rgba(6, 4, 7, .42); transition: border-color .15s, background .15s; }
+  .current-pick:hover { border-color: var(--blood-ring); background: linear-gradient(90deg, var(--blood-soft), transparent 70%), var(--surface); }
+  .current-pick-poster { position: relative; display: grid; place-items: center; width: 3.25rem; aspect-ratio: 2 / 3; overflow: hidden; border-radius: 4px; background: repeating-linear-gradient(135deg, var(--line) 0 1px, var(--bg-elev) 1px 8px); }
+  .current-pick-poster span { padding: .25rem; color: var(--muted); text-align: center; font: 700 .55rem/1.1 var(--display); letter-spacing: .05em; text-transform: uppercase; }
+  .current-pick-poster img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .current-pick-details { min-width: 0; }
+  .current-pick-details h3 { margin: 0 0 .15rem; font-size: 1.25rem; }
+  .current-pick-details p { margin: 0; color: var(--muted); font-size: .82rem; }
+  .current-pick-actions { display: flex; align-items: flex-end; justify-content: flex-end; gap: .65rem; flex-wrap: wrap; }
+  .current-pick-service { display: grid; gap: .25rem; }
+  .current-pick-service label { margin: 0; color: var(--muted); font-size: .7rem; letter-spacing: .1em; text-transform: uppercase; }
+  .service-control { display: flex; align-items: center; gap: .45rem; }
+  .current-pick-service select { width: auto; min-width: 11rem; margin: 0; min-height: 38px; padding-top: .45rem; padding-bottom: .45rem; font-size: .85rem; }
+  .current-pick-service button { min-height: 38px; }
+  .delete-pick { min-width: 5.5rem; }
+  .delete-pick summary { justify-content: center; width: 100%; padding: .45rem .75rem; color: #ffb8be; border: 1px solid rgba(193, 18, 31, .5); border-radius: var(--radius-sm); font-size: .85rem; }
+  .delete-pick summary:hover { color: #ffd0d4; background: var(--blood-soft); }
+  .delete-pick > div { position: absolute; z-index: 2; width: 16rem; right: 0; margin-top: .35rem; padding: .85rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-2); box-shadow: var(--shadow-lift); }
+  .delete-pick { position: relative; }
+  .delete-pick p { margin: 0 0 .65rem; color: var(--muted); font-size: .78rem; }
+  .delete-pick button { width: 100%; }
   .search-form { margin-bottom: 1.25rem; }
   .search-form .year-field { flex: 0 1 9rem; }
   .search-form .query-field { flex: 1 1 18rem; }
@@ -452,6 +480,13 @@
     .field-row { flex-direction: column; align-items: stretch; }
     .field-row button { width: 100%; }
     .search-form .year-field, .search-form .query-field { flex-basis: auto; }
+    .current-picks { padding: 1.15rem; }
+    .current-picks-heading { align-items: flex-start; flex-direction: column; gap: .4rem; }
+    .current-pick { grid-template-columns: 3rem minmax(0, 1fr); }
+    .current-pick-poster { width: 3rem; }
+    .current-pick-actions { grid-column: 1 / -1; justify-content: stretch; padding-top: .35rem; border-top: 1px solid var(--line); }
+    .current-pick-actions > .current-pick-service, .current-pick-actions > .delete-pick { flex: 1 1 10rem; }
+    .current-pick-service select { flex: 1 1 auto; min-width: 0; }
     .user-chip { max-width: 10rem; }
     .profile-head h3 { font-size: 1.5rem; }
     .site-footer { display: flex; flex-direction: column; align-items: center; text-align: center; }

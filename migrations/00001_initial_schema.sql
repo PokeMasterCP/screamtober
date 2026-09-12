@@ -50,7 +50,7 @@ CREATE TABLE challenges (
 ) STRICT;
 
 CREATE TABLE challenge_movies (
-    id INTEGER PRIMARY KEY,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     challenge_id INTEGER NOT NULL REFERENCES challenges (id),
     movie_id INTEGER NOT NULL REFERENCES movies (id),
     position INTEGER CHECK (position BETWEEN 1 AND 31),
@@ -82,7 +82,7 @@ END;
 CREATE TABLE ratings (
     id INTEGER PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users (id),
-    challenge_movie_id INTEGER NOT NULL REFERENCES challenge_movies (id),
+    challenge_movie_id INTEGER NOT NULL REFERENCES challenge_movies (id) ON DELETE CASCADE,
     score INTEGER NOT NULL CHECK (score BETWEEN 1 AND 5),
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (user_id, challenge_movie_id)

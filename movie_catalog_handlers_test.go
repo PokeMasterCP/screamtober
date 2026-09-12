@@ -2,6 +2,9 @@ package main
 
 import (
 	"context"
+	"database/sql"
+	"errors"
+	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"path/filepath"
@@ -101,6 +104,137 @@ func TestAddMovieFromSearch(t *testing.T) {
 	portalRequest(h, "POST", "/admin/logout", nil, cookie)
 	if w := portalRequest(h, "POST", "/admin/movies", form, cookie); w.Code != 403 {
 		t.Fatal("logged-out session saved movie", w.Code)
+	}
+}
+
+func TestUpdateViewingServiceAndDeleteMovie(t *testing.T) {
+	db := schemaFixture(t)
+	execSchema(t, db, `UPDATE challenge_movies SET watched_at = CURRENT_TIMESTAMP WHERE id = 1`)
+	_, h := portalFixture(t, db)
+	admin := adminCookie(t, h)
+
+	page := portalRequest(h, "GET", "/admin/movies/search?year=2026", nil, admin)
+	body := page.Body.String()
+	if page.Code != http.StatusOK || !strings.Contains(body, "2026 lineup") || !strings.Contains(body, "Test movie") || !strings.Contains(body, "Where we’re watching") || !strings.Contains(body, `action="/admin/challenges/2026/movies/1/service"`) {
+		t.Fatalf("current picks missing: %d %s", page.Code, body)
+	}
+	if strings.Contains(body, "Change movie") || strings.Contains(body, "Choosing replacement") || strings.Contains(body, "entry_id") {
+		t.Fatal("replacement flow remains in the lineup UI")
+	}
+	if w := portalRequest(h, "GET", "/admin/challenges/2026/movies/1/service", nil, admin); w.Code != http.StatusMethodNotAllowed {
+		t.Fatal("GET service endpoint allowed")
+	}
+	if w := portalRequest(h, "GET", "/admin/challenges/2026/movies/1/delete", nil, admin); w.Code != http.StatusMethodNotAllowed {
+		t.Fatal("GET delete endpoint allowed")
+	}
+	if w := portalRequest(h, "POST", "/admin/challenges/2026/movies/1/service", url.Values{"viewing_service": {"netflix"}}); w.Code != http.StatusForbidden {
+		t.Fatal("visitor updated viewing service")
+	}
+	if w := portalRequest(h, "POST", "/admin/challenges/2026/movies/1/delete", nil); w.Code != http.StatusForbidden {
+		t.Fatal("visitor deleted movie")
+	}
+	if w := portalRequest(h, "POST", "/admin/challenges/2026/movies/1/service", url.Values{"viewing_service": {"unsupported"}}, admin); w.Code != http.StatusBadRequest {
+		t.Fatal("unsupported viewing service accepted")
+	}
+	if w := portalRequest(h, "POST", "/admin/challenges/2026/movies/1/service", url.Values{"viewing_service": {"netflix"}}, admin); w.Code != http.StatusSeeOther || w.Header().Get("Location") != "/admin/movies/search?year=2026&updated=1" {
+		t.Fatalf("service update response = %d %q", w.Code, w.Header().Get("Location"))
+	}
+	q := store.New(db)
+	challenge, err := q.GetChallengeByYear(context.Background(), 2026)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry, err := q.GetChallengeMovie(context.Background(), store.GetChallengeMovieParams{ID: 1, ChallengeID: challenge.ID})
+	if err != nil || entry.MovieID != 1 || entry.Position.Int64 != 1 || !entry.WatchedAt.Valid || entry.ViewingService != "netflix" {
+		t.Fatalf("service update changed the movie entry = %+v, error = %v", entry, err)
+	}
+	var count int
+	if err := db.QueryRow(`SELECT count(*) FROM ratings WHERE challenge_movie_id = 1`).Scan(&count); err != nil || count != 2 {
+		t.Fatalf("service update changed ratings = %d, error = %v", count, err)
+	}
+	if err := db.QueryRow(`SELECT count(*) FROM ratings WHERE challenge_movie_id = 2`).Scan(&count); err != nil || count != 1 {
+		t.Fatalf("other pick ratings changed = %d, error = %v", count, err)
+	}
+	if _, err := q.GetMovieByTMDBID(context.Background(), 123); err != nil {
+		t.Fatalf("catalog movie removed: %v", err)
+	}
+
+	if w := portalRequest(h, "POST", "/admin/challenges/2026/movies/2/delete", nil, admin); w.Code != http.StatusSeeOther || w.Header().Get("Location") != "/admin/movies/search?year=2026&deleted=1" {
+		t.Fatalf("delete response = %d %q", w.Code, w.Header().Get("Location"))
+	}
+	if _, err := q.GetChallengeMovie(context.Background(), store.GetChallengeMovieParams{ID: 2, ChallengeID: challenge.ID}); !errors.Is(err, sql.ErrNoRows) {
+		t.Fatalf("deleted entry still exists: %v", err)
+	}
+	if err := db.QueryRow(`SELECT count(*) FROM ratings WHERE challenge_movie_id = 2`).Scan(&count); err != nil || count != 0 {
+		t.Fatalf("deleted ratings = %d, error = %v", count, err)
+	}
+	if err := db.QueryRow(`SELECT count(*) FROM ratings WHERE challenge_movie_id = 3`).Scan(&count); err != nil || count != 1 {
+		t.Fatalf("other year's ratings changed = %d, error = %v", count, err)
+	}
+	if w := portalRequest(h, "POST", "/admin/challenges/2026/movies/3/delete", nil, admin); w.Code != http.StatusNotFound {
+		t.Fatal("cross-year delete accepted")
+	}
+	if w := portalRequest(h, "POST", "/admin/challenges/2026/movies/1/delete", nil, admin); w.Code != http.StatusSeeOther {
+		t.Fatalf("second delete response = %d", w.Code)
+	}
+}
+
+// An old tab must never mutate a new pick after the last entry is deleted.
+func TestDeletedMovieRejectsStaleRequests(t *testing.T) {
+	db := schemaFixture(t)
+	_, h := portalFixture(t, db)
+	admin := adminCookie(t, h)
+	setTestUserToken(t, db, 2, "stale-rating-member")
+	member := personalCookie(t, h, "stale-rating-member")
+	if w := portalRequest(h, "POST", "/admin/challenges/2027/movies/3/delete", nil, admin); w.Code != http.StatusSeeOther {
+		t.Fatalf("delete = %d: %s", w.Code, w.Body.String())
+	}
+	if _, err := addYearlyMovie(context.Background(), db, tmdb.MovieSummary{ID: 456, Title: "New pick"}, 2027, "new-pick", "plex"); err != nil {
+		t.Fatal(err)
+	}
+	for _, tt := range []struct {
+		path   string
+		form   url.Values
+		cookie *http.Cookie
+	}{
+		{"/admin/challenges/2027/movies/3/service", url.Values{"viewing_service": {"netflix"}}, admin},
+		{"/admin/challenges/2027/movies/3/delete", nil, admin},
+		{"/challenges/2027/movies/3/rating", url.Values{"score": {"5"}}, member},
+	} {
+		if w := portalRequest(h, "POST", tt.path, tt.form, tt.cookie); w.Code != http.StatusNotFound {
+			t.Errorf("stale request %s = %d: %s", tt.path, w.Code, w.Body.String())
+		}
+	}
+	entries, err := store.New(db).ListChallengeMovies(context.Background(), 2)
+	if err != nil || len(entries) != 1 || entries[0].ID <= 3 || entries[0].ViewingService != "plex" || entries[0].Title != "New pick" {
+		t.Fatalf("replacement changed: %+v, error = %v", entries, err)
+	}
+	var ratings int
+	if err := db.QueryRow(`SELECT count(*) FROM ratings WHERE challenge_movie_id = ?`, entries[0].ID).Scan(&ratings); err != nil || ratings != 0 {
+		t.Fatalf("replacement ratings = %d, error = %v", ratings, err)
+	}
+}
+
+func TestUpdateViewingServiceScope(t *testing.T) {
+	db := schemaFixture(t)
+	ctx := context.Background()
+	for _, tt := range []struct {
+		entry int64
+		year  int
+	}{{3, 2026}, {1, 2099}, {999, 2026}} {
+		if err := setYearlyMovieService(ctx, db, tt.entry, tt.year, "netflix"); !errors.Is(err, sql.ErrNoRows) {
+			t.Fatalf("update %+v = %v, want missing entry", tt, err)
+		}
+	}
+	// Saving an unchanged selection still succeeds, including clearing a service.
+	for _, service := range []string{"netflix", "netflix", "", ""} {
+		if err := setYearlyMovieService(ctx, db, 1, 2026, service); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var changed int
+	if err := db.QueryRow(`SELECT count(*) FROM challenge_movies WHERE viewing_service != ''`).Scan(&changed); err != nil || changed != 0 {
+		t.Fatalf("unexpected service changes = %d, error = %v", changed, err)
 	}
 }
 

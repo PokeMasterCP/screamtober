@@ -56,7 +56,6 @@ func TestSchemaConstraints(t *testing.T) {
 		{"unknown entry", `INSERT INTO ratings (user_id, challenge_movie_id, score) VALUES (2, 99, 4)`},
 		{"unknown movie", `INSERT INTO challenge_movies (challenge_id, movie_id, position) VALUES (1, 99, 3)`},
 		{"unknown challenge", `INSERT INTO challenge_movies (challenge_id, movie_id, position) VALUES (99, 1, 3)`},
-		{"delete rated entry", `DELETE FROM challenge_movies WHERE id = 1`},
 		{"delete referenced movie", `DELETE FROM movies WHERE id = 1`},
 		{"delete referenced year", `DELETE FROM challenges WHERE id = 1`},
 		{"delete rating author", `DELETE FROM users WHERE id = 2`},
@@ -89,6 +88,28 @@ func TestHouseholdLimit(t *testing.T) {
 		}
 	}
 	execSchema(t, db, `UPDATE users SET role = 'member', display_name = 'Renamed' WHERE id = 2`)
+}
+
+func TestDeleteEntryCascadesOnlyItsRatings(t *testing.T) {
+	db := schemaFixture(t)
+	// A raw DELETE must enforce the same cleanup as the HTTP handler.
+	execSchema(t, db, `DELETE FROM challenge_movies WHERE id = 1`)
+	for entry, want := range map[int]int{1: 0, 2: 1, 3: 1} {
+		var count int
+		if err := db.QueryRow(`SELECT count(*) FROM ratings WHERE challenge_movie_id = ?`, entry).Scan(&count); err != nil || count != want {
+			t.Fatalf("entry %d ratings = %d, want %d, error = %v", entry, count, want, err)
+		}
+	}
+	for _, table := range []string{"movies", "challenges", "challenge_movies"} {
+		var count int
+		want := 2
+		if table == "movies" {
+			want = 1
+		}
+		if err := db.QueryRow("SELECT count(*) FROM " + table).Scan(&count); err != nil || count != want {
+			t.Fatalf("%s count = %d, want %d, error = %v", table, count, want, err)
+		}
+	}
 }
 
 func TestRatingEditsAndYearIsolation(t *testing.T) {
@@ -139,5 +160,14 @@ func TestSchemaRollbackAndRebuild(t *testing.T) {
 	}
 	if err := db.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name IN ('users', 'movies', 'challenges', 'challenge_movies', 'ratings', 'user_tokens')`).Scan(&count); err != nil || count != 6 {
 		t.Fatalf("tables after upgrade = %d, error = %v", count, err)
+	}
+}
+
+func TestEntryIDsNotReusedAfterClearingLineup(t *testing.T) {
+	db := schemaFixture(t)
+	execSchema(t, db, "DELETE FROM challenge_movies")
+	var id int64
+	if err := db.QueryRow(`INSERT INTO challenge_movies (challenge_id, movie_id) VALUES (1, 1) RETURNING id`).Scan(&id); err != nil || id <= 3 {
+		t.Fatalf("entry identity reused: id = %d, error = %v", id, err)
 	}
 }

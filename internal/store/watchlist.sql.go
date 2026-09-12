@@ -90,6 +90,52 @@ func (q *Queries) CountChallengeMovies(ctx context.Context, challengeID int64) (
 	return count, err
 }
 
+const deleteChallengeMovie = `-- name: DeleteChallengeMovie :execrows
+DELETE FROM challenge_movies
+WHERE challenge_movies.id = ?1
+  AND challenge_movies.challenge_id = (SELECT challenges.id FROM challenges WHERE challenges.year = ?2)
+`
+
+type DeleteChallengeMovieParams struct {
+	ID   int64
+	Year int64
+}
+
+// Delete only the requested year's entry; its ratings cascade automatically.
+func (q *Queries) DeleteChallengeMovie(ctx context.Context, arg DeleteChallengeMovieParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteChallengeMovie, arg.ID, arg.Year)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const getChallengeMovie = `-- name: GetChallengeMovie :one
+SELECT id, challenge_id, movie_id, position, watched_at, submission_key, viewing_service FROM challenge_movies
+WHERE id = ? AND challenge_id = ?
+`
+
+type GetChallengeMovieParams struct {
+	ID          int64
+	ChallengeID int64
+}
+
+// Both identifiers scope the lookup to one challenge entry.
+func (q *Queries) GetChallengeMovie(ctx context.Context, arg GetChallengeMovieParams) (ChallengeMovie, error) {
+	row := q.db.QueryRowContext(ctx, getChallengeMovie, arg.ID, arg.ChallengeID)
+	var i ChallengeMovie
+	err := row.Scan(
+		&i.ID,
+		&i.ChallengeID,
+		&i.MovieID,
+		&i.Position,
+		&i.WatchedAt,
+		&i.SubmissionKey,
+		&i.ViewingService,
+	)
+	return i, err
+}
+
 const getEntryBySubmission = `-- name: GetEntryBySubmission :one
 SELECT id, challenge_id, movie_id, position, watched_at, submission_key, viewing_service FROM challenge_movies WHERE submission_key = ?
 `
@@ -165,6 +211,28 @@ func (q *Queries) ListChallengeMovies(ctx context.Context, challengeID int64) ([
 		return nil, err
 	}
 	return items, nil
+}
+
+const setChallengeMovieViewingService = `-- name: SetChallengeMovieViewingService :execrows
+UPDATE challenge_movies
+SET viewing_service = ?1
+WHERE challenge_movies.id = ?2
+  AND challenge_movies.challenge_id = (SELECT challenges.id FROM challenges WHERE challenges.year = ?3)
+`
+
+type SetChallengeMovieViewingServiceParams struct {
+	ViewingService string
+	ID             int64
+	Year           int64
+}
+
+// Scope the update to one entry in the requested year.
+func (q *Queries) SetChallengeMovieViewingService(ctx context.Context, arg SetChallengeMovieViewingServiceParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, setChallengeMovieViewingService, arg.ViewingService, arg.ID, arg.Year)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const setChallengeMovieWatchedAt = `-- name: SetChallengeMovieWatchedAt :one

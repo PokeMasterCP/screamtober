@@ -30,6 +30,27 @@
   <p class="toolbar-links"><a href="/admin/calendar?year={{.Year}}">Arrange the {{.Year}} lineup →</a></p>
   {{if .Error}}<p class="error" id="search-error" role="alert">{{.Error}}</p>{{end}}
   {{if .Notice}}<p class="notice" role="status">{{.Notice}}</p>{{end}}
+  {{if .Current}}
+  <section class="current-picks" aria-labelledby="current-picks-heading">
+    <div class="current-picks-heading"><div><p class="eyebrow">Already selected</p><h2 id="current-picks-heading">{{.Year}} lineup</h2></div><span class="count"><b>{{len .Current}}</b> / 31 picks</span></div>
+    <p class="current-picks-note">Update where you’re watching without changing the movie, its night, watched status, or ratings. Delete removes that pick and its ratings; the catalog stays available for repeats and past years.</p>
+    <ol class="current-pick-list">
+      {{range .Current}}
+      <li class="current-pick">
+        <div class="current-pick-poster" aria-hidden="true"><span>Poster unavailable</span>{{if .PosterURL}}<img src="{{.PosterURL}}" alt="" width="100" height="150" loading="lazy" decoding="async" referrerpolicy="no-referrer">{{end}}</div>
+        <div class="current-pick-details"><h3>{{.Title}}</h3><p>{{if .Position.Valid}}October {{printf "%02d" .Position.Int64}}{{else}}Unscheduled{{end}} · {{if .WatchedAt.Valid}}Watched{{else}}Unwatched{{end}}{{if .Service.Name}} · {{.Service.Name}}{{end}}</p></div>
+        <div class="current-pick-actions">
+          {{$currentService := .ViewingService}}<form class="current-pick-service" method="post" action="/admin/challenges/{{$.Year}}/movies/{{.ID}}/service">
+            <label for="service-{{.ID}}">Where we’re watching</label>
+            <div class="service-control"><select id="service-{{.ID}}" name="viewing_service"><option value=""{{if not $currentService}} selected{{end}}>Not decided</option>{{range $.Services}}<option value="{{.ID}}"{{if eq .ID $currentService}} selected{{end}}>{{.Name}}</option>{{end}}</select><button class="secondary small" type="submit">Save</button></div>
+          </form>
+          <details class="delete-pick"><summary>Delete</summary><div><p>This removes the pick and its ratings.</p><form method="post" action="/admin/challenges/{{$.Year}}/movies/{{.ID}}/delete"><button class="danger small" type="submit" aria-label="Delete {{.Title}} from the {{$.Year}} challenge">Delete movie</button></form></div></details>
+        </div>
+      </li>
+      {{end}}
+    </ol>
+  </section>
+  {{end}}
   {{if .Searched}}
   <section class="search-results" aria-labelledby="results-heading">
     <div class="results-heading"><h2 id="results-heading">Search results</h2><span>Page {{.Page}}{{if .Query}} · “{{.Query}}”{{end}}</span></div>

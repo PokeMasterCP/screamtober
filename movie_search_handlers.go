@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -45,7 +46,19 @@ type movieSearchPage struct {
 	Notice    string
 	Searched  bool
 	Empty     bool
+	Current   []adminMovie
 }
+
+type adminMovie struct {
+	ID             int64
+	Title          string
+	Position       sql.NullInt64
+	WatchedAt      sql.NullString
+	ViewingService string
+	PosterURL      string
+}
+
+func (m adminMovie) Service() viewingService { return findViewingService(m.ViewingService) }
 
 func (h *movieSearchHandler) search(w http.ResponseWriter, r *http.Request) {
 	data := movieSearchPage{Query: strings.TrimSpace(r.URL.Query().Get("q"))}
@@ -54,6 +67,14 @@ func (h *movieSearchHandler) search(w http.ResponseWriter, r *http.Request) {
 		data.Year, _ = strconv.Atoi(raw)
 	}
 	status := http.StatusOK
+	if data.Year >= 1 && data.Year <= 9999 {
+		switch {
+		case r.URL.Query().Get("deleted") == "1":
+			data.Notice = fmt.Sprintf("The movie was deleted from %d. Its ratings were removed; the catalog record remains available.", data.Year)
+		case r.URL.Query().Get("updated") == "1":
+			data.Notice = fmt.Sprintf("The viewing service was updated for the %d lineup.", data.Year)
+		}
+	}
 	page := 1
 	if raw := r.URL.Query().Get("page"); raw != "" {
 		page, _ = strconv.Atoi(raw)
@@ -123,7 +144,43 @@ func (h *movieSearchHandler) search(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	h.render(w, r, status, data)
+}
+
+func (h *movieSearchHandler) loadCurrent(ctx context.Context, data *movieSearchPage) error {
+	challenge, err := h.admin.queries.GetChallengeByYear(ctx, int64(data.Year))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	rows, err := h.admin.queries.ListChallengeMovies(ctx, challenge.ID)
+	if err != nil {
+		return err
+	}
+	for _, movie := range rows {
+		data.Current = append(data.Current, adminMovie{
+			ID: movie.ID, Title: movie.Title, Position: movie.Position, WatchedAt: movie.WatchedAt,
+			ViewingService: movie.ViewingService, PosterURL: moviePosterURL(movie.PosterPath),
+		})
+	}
+	return nil
+}
+
+func (h *movieSearchHandler) render(w http.ResponseWriter, r *http.Request, status int, data movieSearchPage) {
+	if data.Year >= 1 && data.Year <= 9999 {
+		if err := h.loadCurrent(r.Context(), &data); err != nil {
+			h.fail(w, r, err)
+			return
+		}
+	}
 	h.admin.render(w, r, "admin_movie_search.html", status, data)
+}
+
+func (h *movieSearchHandler) fail(w http.ResponseWriter, r *http.Request, err error) {
+	setRequestEvent(r, slog.LevelError, "movie management failed", "error", err)
+	http.Error(w, "Unable to load movie management. Please try again later.", http.StatusInternalServerError)
 }
 
 type movieChoice struct {

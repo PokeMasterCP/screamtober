@@ -105,6 +105,12 @@ add a repeat. Existing catalog metadata and previous years are preserved.
 If your results expire (after ten minutes) or the app restarts, search again.
 Personal sessions and visitors cannot access this admin tool.
 
+The same page shows the current lineup for the selected year. Use each pick’s
+**Where we’re watching** control to change its viewing service; this does not change
+the movie, its scheduled night, watched status, or ratings. Choose **Delete** to
+remove that pick and its ratings from the year. The shared catalog record is kept
+for repeats and previous years. These actions require the administrator session.
+
 Choose **Arrange movies** in the admin panel to schedule a year’s added movies.
 Drag posters from the unscheduled tray onto the 31-day October calendar; dropping
 onto an occupied day swaps the two entries. Drag a poster back to the tray to
@@ -118,7 +124,6 @@ add `-e TMDB_API_KEY` to either deployment command after exporting the variable.
 The web app still starts without the key and serves cached challenge data;
 search displays a configuration message until the key is supplied. The CLI
 commands remain local developer tools and are not bundled in the Docker image.
-Watchlist editing will follow later.
 
 ## Logging
 
