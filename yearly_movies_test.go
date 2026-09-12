@@ -19,7 +19,7 @@ func TestYearlyMovies(t *testing.T) {
 		ref       string
 		duplicate bool
 	}{{2028, "first", false}, {2028, "first", true}, {2028, "repeat", false}, {2029, "first", false}} {
-		duplicate, err := addYearlyMovie(ctx, db, movie, tt.year, tt.ref)
+		duplicate, err := addYearlyMovie(ctx, db, movie, tt.year, tt.ref, "")
 		if err != nil || duplicate != tt.duplicate {
 			t.Fatal(duplicate, err)
 		}
@@ -36,7 +36,7 @@ func TestYearlyMovies(t *testing.T) {
 	for i := len(rows); i < 31; i++ {
 		execSchema(t, db, `INSERT INTO challenge_movies (challenge_id,movie_id) VALUES (?,?)`, challenge.ID, rows[0].MovieID)
 	}
-	_, err = addYearlyMovie(ctx, db, tmdb.MovieSummary{ID: 999, Title: "Overflow"}, 2028, "full")
+	_, err = addYearlyMovie(ctx, db, tmdb.MovieSummary{ID: 999, Title: "Overflow"}, 2028, "full", "")
 	if !errors.Is(err, errYearFull) {
 		t.Fatal(err)
 	}

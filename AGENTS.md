@@ -88,8 +88,7 @@ Use structured JSON with request ID, client IP, method, path, status, duration, 
 
 ### Database changes
 
-- The project is currently pre-production: only disposable test and staging databases exist, and no data needs to survive schema revisions. Existing Goose migrations may be edited or consolidated; recreate those databases instead of adding compatibility migrations solely to preserve test data. Do not add automatic database deletion at application startup.
-- Once production deployment or data-retention requirements begin, stop rewriting applied migrations and use new Goose migrations that preserve existing data. Never change production schemas manually.
+- The production site is live. Preserve all existing data and applied Goose migrations; add new migrations for schema changes. Never recreate production databases or change production schemas manually. Do not add automatic database deletion at application startup.
 - Edit SQL source queries and regenerate `sqlc` output when needed. Do not hand-edit generated database access code.
 - Use parameterized queries and transactions for changes that must succeed or fail together.
 - Preserve existing challenge history and ratings during migrations. Call out destructive changes and their data consequences before implementation.
@@ -104,6 +103,8 @@ Use structured JSON with request ID, client IP, method, path, status, duration, 
 
 ## Development workflow
 Create feature branches from up-to-date `main` and open PRs directly into `main`.
+Use PR titles in the form `<type>(service): summary`, for example
+`feat(watchlist): add viewing services` or `fix(database): preserve existing data during upgrades`.
 CI checks PRs and pushes to `main`; test changes in the temporary PR environment
 before merging. There is no staging-branch promotion step.
 

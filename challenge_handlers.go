@@ -35,6 +35,8 @@ type challengePage struct {
 	User    *store.User
 }
 
+func (m challengeMovieView) Service() viewingService { return findViewingService(m.ViewingService) }
+
 type challengeMovieView struct {
 	store.ListChallengeMoviesRow
 	PosterURL  string

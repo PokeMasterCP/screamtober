@@ -31,6 +31,8 @@ const movieSearchPageSize = 10
 // Two displayed pages cover one TMDB page, and TMDB serves at most 500 pages.
 const movieSearchMaxPage = 1000
 
+func (movieSearchPage) Services() []viewingService { return selectableViewingServices() }
+
 type movieSearchPage struct {
 	Year      int
 	Query     string
