@@ -47,7 +47,10 @@ databases; rolling back the initial migration destroys all application data.
 
 ## Pages and logging
 
-Templates share `site_style.html` and the buffered `renderPage` helper. Rating
+Templates share `site_style.html` and the buffered `renderPage` helper. HTML
+pages set `Referrer-Policy: strict-origin` so same-origin form POSTs still send
+Origin; browsers omit `Sec-Fetch-Site` for HTTP private-IP hosts, and
+`no-referrer` can make them send `Origin: null`. Rating
 controls and verdicts use `movie_ratings.html` in both featured and carousel cards.
 Carousel cards are poster-only; their accessible names identify the movies.
 Calendar arrangement intentionally supports drag-and-drop only. Keep server-side

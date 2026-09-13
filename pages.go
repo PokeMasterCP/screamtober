@@ -16,6 +16,9 @@ func renderPage(w http.ResponseWriter, r *http.Request, pages *template.Template
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	// no-referrer makes some browsers send Origin: null, which fails CSRF checks
+	// on HTTP private-IP origins where Sec-Fetch-Site is also omitted.
+	w.Header().Set("Referrer-Policy", "strict-origin")
 	w.WriteHeader(status)
 	_, _ = body.WriteTo(w)
 }

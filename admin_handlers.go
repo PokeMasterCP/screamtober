@@ -62,7 +62,6 @@ func (h *adminHandler) showUsers(w http.ResponseWriter, r *http.Request, status 
 
 func (h *adminHandler) render(w http.ResponseWriter, r *http.Request, name string, status int, data any) {
 	w.Header().Set("Cache-Control", "no-store")
-	w.Header().Set("Referrer-Policy", "no-referrer")
 	renderPage(w, r, h.pages, name, status, data)
 }
 
