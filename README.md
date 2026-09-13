@@ -158,7 +158,10 @@ AUTH_INSECURE_COOKIE=true go run .
 ```
 
 Open [localhost:8080](http://127.0.0.1:8080). Restart the app after changing code or
-templates. Set `ADDR` to use a different listening address.
+templates. Set `ADDR` to use a different listening address. To open the app from
+another device on your LAN, listen on all interfaces (`ADDR=:8080`) with
+`AUTH_INSECURE_COOKIE=true` and use the host’s private IP. Keep insecure cookies
+off for hosted HTTPS.
 
 ## Deploy with Docker
 

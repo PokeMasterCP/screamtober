@@ -66,7 +66,7 @@ func newHandlerWithMovieSearch(auth *auth, db *sql.DB, movies movieSearcher) (ht
 	root := http.NewServeMux()
 	registerAssetRoutes(root)
 	root.Handle("/", auth.restrictAdminSession(mux))
-	return http.NewCrossOriginProtection().Handler(root), nil
+	return protectCrossOrigin(root), nil
 }
 
 func main() {

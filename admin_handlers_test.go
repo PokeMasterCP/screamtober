@@ -96,7 +96,7 @@ func issuedToken(t *testing.T, w *httptest.ResponseRecorder, status int) string 
 	if err != nil || len(decoded) != 32 {
 		t.Fatal("token does not contain 256 random bits")
 	}
-	if w.Header().Get("Cache-Control") != "no-store" || w.Header().Get("Referrer-Policy") != "no-referrer" {
+	if w.Header().Get("Cache-Control") != "no-store" || w.Header().Get("Referrer-Policy") != "strict-origin" {
 		t.Fatal("credential response missing privacy headers")
 	}
 	return match[1]
