@@ -1,65 +1,77 @@
 # Development
 
-Use Go 1.27.0 and sqlc 1.31.1. Run from the repository root:
+See [README.md](README.md) to run the app and [AGENTS.md](AGENTS.md) for product,
+security, and contribution rules.
+
+## Tools and checks
+
+Use Go 1.27.0 (`go.mod`). From the repository root, format changed Go files with
+`gofmt`, then run the checks used by CI:
+
+```sh
+go test ./...
+go vet ./...
+```
+
+After editing SQL in `queries/` or changing the schema, regenerate and validate
+with sqlc 1.31.1, then rerun the checks:
 
 ```sh
 go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1
 go generate ./...
 sqlc compile
-go test ./...
-go vet ./...
 ```
 
-Edit SQL in `queries/` and regenerate `internal/store/`; never hand-edit generated
-code. `sqlc.yaml` reads the Goose migrations as its schema. Keep only queries
-needed by the web application. Tests can inspect fixtures with parameterized SQL.
+`sqlc.yaml` reads `migrations/` as its schema and generates `internal/store/`.
+Never hand-edit generated code. Keep only queries needed by the app; tests can
+inspect fixtures with parameterized SQL.
 
-## Data and transactions
+## Database changes
 
-The catalog preserves the first stored metadata for each TMDB ID. Challenge entries
-may repeat a movie, and carry their own position, service, watched time, and ratings.
-Submission references prevent duplicate POST retries while allowing intentional repeats.
-
-Use request contexts for database operations. `withTransaction` supplies a query
-handle for atomic operations. Saving a rating and setting the entry's watched time
-must commit together; subsequent saves preserve an existing watched time. This
-behavior applies to new saves without backfilling historical entries on startup.
-Calendar reordering clears and assigns positions in one transaction, retaining IDs.
-
-Handlers enforce authorization. Admin sessions manage movies and household access;
-personal sessions submit only their own ratings, which also mark the entry watched.
-Scope writes to the requested challenge and entry. The owner role is a household
-label, not an administration credential.
-
-## Migrations
-
-Production data and applied Goose migrations must be preserved. Add new migrations
-for schema changes and verify upgrades against a disposable database containing
-existing data. Never run destructive validation on production. To author migrations:
+Add new Goose migrations; preserve applied migrations and production data:
 
 ```sh
 go install github.com/pressly/goose/v3/cmd/goose@v3.28.0
 goose -dir migrations -s create describe_change sql
 ```
 
-Use `-- +goose Up` and `-- +goose Down` sections. Rollback is for disposable test
-databases; rolling back the initial migration destroys all application data.
+Use `-- +goose Up` and `-- +goose Down` sections. Test fresh installs and upgrades
+on disposable databases containing representative history. Rollback is for
+disposable test databases; the initial migration's rollback deletes all app data.
 
-## Pages and logging
+The catalog retains the first stored metadata for each TMDB ID. Repeated picks
+have their own position, service, watched time, and ratings. Submission references
+prevent duplicate POST retries while allowing intentional repeats.
 
-Templates share `site_style.html` and the buffered `renderPage` helper. HTML
-pages set `Referrer-Policy: strict-origin` so same-origin form POSTs still send
-Origin; browsers omit `Sec-Fetch-Site` for HTTP private-IP hosts, and
-`no-referrer` can make them send `Origin: null`. Rating
-controls and verdicts use `movie_ratings.html` in both featured and carousel cards.
-Carousel cards are poster-only; their accessible names identify the movies.
-Calendar arrangement intentionally supports drag-and-drop only. Keep server-side
-validation, conflict detection, and rollback coverage regardless of the interaction.
+Use `withTransaction` for atomic changes. Rating saves and marking an entry watched
+commit together, preserving its first watched time without backfilling history at
+startup. Calendar reordering clears and assigns positions in one transaction,
+retaining entry IDs. Scope writes to the requested challenge and entry.
 
-Each HTTP request produces one completion event. Handlers call `setRequestEvent`
-synchronously to attach the operation, outcome, and relevant error. Independent
-startup and lifecycle events have their own records. Never log credentials, cookies,
-authorization headers, request bodies, or complete query strings. Validated search
-titles are intentionally recorded as `search_term`; invalid input is omitted.
-Successful login returns a confirmation page, and explicit navigation is a separate
-logged request.
+## Pages
+
+Use `site_style.html`, the buffered `renderPage` helper, and `movie_ratings.html`
+for shared rating controls and verdicts. Poster-only carousel cards must retain
+accessible movie names. Keep server-side validation, conflict detection, and
+rollback coverage for calendar arrangement.
+
+Keep `Referrer-Policy: strict-origin`: browsers may omit `Sec-Fetch-Site` on HTTP
+private-IP hosts, and `no-referrer` can produce `Origin: null` on form POSTs,
+breaking cross-origin request protection.
+
+## Logging
+
+Write structured JSON with request ID, client IP, method, path, status, duration,
+and response size. Use one completion event per HTTP request; handlers call
+`setRequestEvent` synchronously to add operation, outcome, and relevant errors.
+Avoid separate handler and access logs for the same event. Independent startup
+and lifecycle events get their own records.
+
+Never log credentials, cookies, authorization headers, request bodies, or complete
+query strings. Validated search titles are intentionally recorded as `search_term`;
+invalid input is omitted. `LOG_LEVEL` accepts `debug`, `info` (default), `warn`, or
+`error`.
+
+Successful login returns a 200 confirmation page with a continuation link instead
+of an automatic redirect. Explicit navigation is a separate logged request; never
+suppress real requests to reduce log counts.

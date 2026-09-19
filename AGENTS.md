@@ -1,137 +1,125 @@
 # AGENTS.md
 
-## Project overview
+## Project and product rules
 
-This project is screamtober, a publicly accessible web application for an annual October movie challenge. 
+Screamtober is a self-hosted October movie challenge: up to 31 picks per year,
+shared viewing progress, and personal ratings. Preserve previous years as the
+catalog grows. Watchlists may be incomplete and may repeat movies.
 
-Users build a watchlist of 31 movies, track viewing progress, and rate movies throughout October. Data is organized by year so users can revisit previous challenges while their movie catalog grows.
+| Session | Permissions |
+| --- | --- |
+| Visitor | View public challenge data only |
+| Personal (owner or member) | View challenges and submit or edit their own ratings |
+| Admin | Manage movies, arrangements, and household access; no personal ratings |
 
-### Users and permissions
+- Enforce permissions on every relevant backend request. Public access excludes
+  credentials, sessions, and account management; visitors cannot change data.
+- Ratings are whole stars from 1–5, tied to each challenge entry. Average only
+  submitted ratings. Saving a rating must atomically mark that entry watched for
+  the household, preserving its first watched timestamp on subsequent saves.
+- The admin provisions one owner and up to three members with random personal
+  tokens distributed privately. There is no public registration. The owner label
+  grants no administrative privileges through a personal session.
+- `ADMIN_TOKEN` is a runtime administrator secret, never a rating credential.
+  Store only personal token hashes. Replacing a token or disabling access revokes
+  existing access while preserving profiles and ratings. Disabled profiles count
+  toward the household limit.
+- `/login` accepts both token types. Admin and personal sessions use separate
+  cookies but are mutually exclusive in a browser. Admin sign-in revokes the
+  current personal session; require admin sign-out before personal use. Enforce
+  this on the server, including direct navigation and sign-in attempts.
 
-The application supports one owner and up to three additional authenticated users.
+## Stack and implementation
 
-| Role | Add movies | Rate movies | View public challenge data |
-| --- | --- | --- | --- |
-| Owner | Yes | Yes | Yes |
-| Authenticated user | No | Yes | Yes |
-| Unauthenticated visitor | No | No | Yes |
+Use Go, SQLite, Goose migrations, sqlc-generated queries, server-rendered HTML/CSS,
+and server-side TMDB integration. Package with Docker. Follow existing package,
+error-handling, metadata-storage, and caching conventions.
 
-- Enforce permissions in the Go backend on every relevant request. Hiding UI controls is not authorization.
-- Unauthenticated visitors must not be able to change application data.
-- Public access applies to intended public challenge data; it does not make credentials, sessions, or account-management data public.
-- Preserve previous years when creating or updating a challenge for another year.
+- Keep changes small and focused. Separate request handling, business rules, and
+  database access where the existing design supports it; avoid unnecessary
+  abstractions, dependencies, and unrelated refactoring.
+- Use request contexts for database and external API operations, and timeouts for
+  external calls. Use parameterized SQL and transactions for atomic changes.
+- Escape untrusted content with HTML templates. Use semantic HTML, accessible
+  labels, and clear validation errors. Calendar arrangement is intentionally
+  drag-and-drop only; carousel cards use posters without visible titles or descriptions.
+- Keep TMDB credentials and authenticated calls on the server. Handle missing
+  fields, timeouts, rate limits, and failures without exposing secrets or internal
+  errors. Existing history should not depend on live TMDB requests. Check current
+  TMDB requirements when changing attribution or API usage.
+- The production site is live. Preserve existing data and applied Goose migrations;
+  add migrations for schema changes. Never manually alter production schemas,
+  recreate production databases, or delete databases at startup. Explain destructive
+  changes and their consequences before implementation.
+- Edit SQL in `queries/` and regenerate `internal/store/`; never edit generated code.
+  Add database constraints for established invariants alongside application validation.
 
-### Established product and access decisions
+## Deployment and security
 
-- Watchlists may be incomplete, contain repeated movies, and have at most 31 entries per year.
-- Viewing progress is shared by the household. Saving a personal rating atomically marks that challenge entry watched, preserving its first watched timestamp on later saves. Other administration requires an admin session.
-- Ratings are whole stars from 1–5, editable by their author, and tied to each challenge entry. Average only submitted ratings.
-- `ADMIN_TOKEN` is a runtime secret for administrator access. It is never a personal rating credential.
-- The owner has a personal profile and token, just like members. The `owner` role is a household label; it does not grant administration through a personal session.
-- The admin provisions one owner and up to three members, issuing random personal tokens for private out-of-band distribution. There is no public registration.
-- Store only personal token hashes. Replacing a token or disabling access revokes existing access while preserving profiles and ratings. Disabled profiles count toward the household limit.
-- `/login` accepts both token types. Admin and personal sessions use separate cookies and are mutually exclusive in the same browser. Admin sign-in revokes the current personal session; admin users must sign out of the panel before returning to personal use. Enforce this boundary on the server, including direct navigation and sign-in attempts.
+Support the same Docker image with either operator-managed HTTPS ingress or a
+Cloudflare Tunnel. Keep code and documentation provider-neutral; do not add
+provider-specific environment detection or requirements. Run one app instance.
+Discuss scaling or storage changes before adding instances with independent SQLite files.
 
-## Technology stack
+- The Go server serves HTTP. Hosted deployments require HTTPS termination and
+  secure cookies; `AUTH_INSECURE_COOKIE=true` is for local HTTP development only.
+- In both modes, the app remains responsible for authentication, authorization,
+  input validation, session security, and CSRF protection. Never mutate state via GET.
+- With `CLOUDFLARE_TUNNEL=true`, allow public ingress only through the tunnel and
+  trust internal services with app access. Trust one valid IPv4 or IPv6
+  `CF-Connecting-IP`; missing, malformed, or duplicate values fall back to the
+  socket peer IP. Do not require proxy CIDR configuration.
+- With tunnel mode unset or false, use the socket peer IP and ignore forwarded IP
+  headers. Never infer trust from a header's presence. Tunnel mode does not create
+  a tunnel or enable forwarded scheme trust. Operators configure ingress and edge
+  protections; Cloudflare routing alone does not guarantee WAF, rate limiting, or
+  bot protection.
+- Keep SQLite private on a mounted persistent volume. `DATABASE_DIR` defaults to
+  `/data` in Docker and `data` locally; open only `screamtober.db` directly inside
+  it. Do not search for or select other database files. Deployment must verify the
+  persistent mount.
+- Keep `ADDR`, `DATABASE_DIR`, `CLOUDFLARE_TUNNEL`, `ADMIN_TOKEN`,
+  `AUTH_INSECURE_COOKIE`, and `LOG_LEVEL` configurable at runtime; Docker values
+  are overridable defaults. Supply secrets at runtime and keep them out of source
+  control, logs, and public responses. Personal tokens are shown only when issued.
+- Use volume snapshots where available and periodic SQLite-consistent portable
+  backups. Account for journal/WAL state; verify restoration before relying on backups.
 
-- **Backend:** Go
-- **Database:** SQLite
-- **Migrations:** Goose
-- **Database access:** SQL queries with code generated by `sqlc`
-- **Frontend:** Server-rendered HTML and CSS
-- **Movie metadata:** TMDB API
-- **Packaging:** Docker
-- **Hosting:** Any environment supporting Docker, with optional Cloudflare Tunnel
+## Workflow and validation
 
-Follow existing repository conventions. Prefer the current stack and small, focused dependencies. Discuss new frameworks, infrastructure services, or major dependencies before introducing them.
+Read relevant code, configuration, tests, and [DEVELOPMENT.md](DEVELOPMENT.md)
+before changes. Use its documented commands and pinned tools. Preserve unrelated
+work. Explain a short plan for larger tasks and discuss material changes to
+architecture, dependencies, project structure, or data flow. Voice concrete
+concerns and suggest simpler alternatives; continue routine authorized work
+without unnecessary approval requests.
 
-## Deployment architecture
-
-Support two deployment methods, both using the same Docker image:
-
-1. **With Cloudflare Tunnel:** Browser → Cloudflare HTTPS edge → outbound tunnel → cloudflared → Go application on a private network → SQLite on a persistent volume.
-2. **Without Cloudflare Tunnel:** Browser → operator-managed HTTPS ingress → Go application → SQLite on a persistent volume. Local HTTP is supported for development.
-
-Keep code and documentation hosting-provider neutral. Do not introduce provider-specific environment detection or requirements.
-
-### Required security and persistence boundaries
-
-- `CLOUDFLARE_TUNNEL=true` enables trust in `CF-Connecting-IP`. In this mode the Go application must have no public ingress that bypasses the tunnel. Infrastructure establishes the trusted path; internal services with access to the app must be trusted. Do not require proxy CIDR configuration.
-- With `CLOUDFLARE_TUNNEL` unset or false, use the socket peer IP and ignore forwarded IP headers. A reverse proxy may therefore appear as the client in logs. Do not infer trust from a header's presence.
-- In tunnel mode, use a single valid IPv4 or IPv6 `CF-Connecting-IP` value; missing, malformed, or duplicate values fall back to the socket peer IP. The setting does not create a tunnel or enable forwarded scheme trust.
-- Without a tunnel, the operator controls public ingress, HTTPS termination, and edge protections. The Go server serves HTTP; hosted deployments need HTTPS termination in front of it.
-- Cloudflare protections depend on the configured service and rules. Do not assume WAF, rate limiting, or bot protection is active merely because traffic passes through Cloudflare.
-- In both modes the Go application remains responsible for authentication, authorization, input validation, session security, and CSRF protection. State-changing actions must not use GET requests.
-- Keep secure cookies enabled for hosted HTTPS. `AUTH_INSECURE_COOKIE=true` is only for local HTTP development.
-- SQLite must not be network-accessible. Its database file must reside on a mounted persistent volume, not the container's ephemeral filesystem.
-- Use one storage setting, `DATABASE_DIR`: Docker defaults to `/data`, local Go runs to `data`. Always open `screamtober.db` directly inside that directory; do not search for databases or select another file. Deployment must verify that persistent storage is actually mounted.
-- Docker environment values are overridable defaults. Keep `ADDR`, `DATABASE_DIR`, `CLOUDFLARE_TUNNEL`, `ADMIN_TOKEN`, `AUTH_INSECURE_COOKIE`, and `LOG_LEVEL` configurable at runtime.
-- Keep TMDB credentials, tunnel tokens, and other secrets out of source control, client responses, and logs. Use runtime configuration for secrets.
-- Use volume snapshots where available and periodic SQLite-consistent portable backups. Do not copy a live database file without accounting for its journal or WAL. Verify restoration before relying on backups.
-- Run one application instance. Discuss scaling or storage changes before introducing multiple instances with independent SQLite files.
-
-## Logging
-
-Prefer one event per log record, and one completion event per HTTP request. Enrich that completion event with the operation, outcome, and relevant error instead of emitting separate handler and access logs for the same event. Independent startup and lifecycle events get their own records.
-
-Use structured JSON with request ID, client IP, method, path, status, duration, and response size. Do not log tokens, cookies, authorization headers, request bodies, or query strings. Successful login returns a 200 confirmation page with a continuation link, avoiding an automatic redirect GET. Explicit navigation remains a separate logged request; do not suppress real requests merely to reduce log count.
-
-## Implementation guidance
-
-### Go and server-rendered pages
-
-- Follow the repository's existing package structure and error-handling conventions.
-- Keep request handling, business rules, and database access separated where the existing design supports it; avoid unnecessary abstractions.
-- Use request contexts for database and external API operations, and bound external calls with timeouts.
-- Use escaped HTML templates for user-controlled and externally sourced text. Do not mark untrusted content as safe HTML.
-- Keep forms and navigation usable with semantic HTML, accessible labels, and clear validation feedback. Calendar arrangement intentionally supports drag-and-drop only; carousel cards intentionally use posters without visible titles or descriptions.
-
-### Database changes
-
-- The production site is live. Preserve all existing data and applied Goose migrations; add new migrations for schema changes. Never recreate production databases or change production schemas manually. Do not add automatic database deletion at application startup.
-- Edit SQL source queries and regenerate `sqlc` output when needed. Do not hand-edit generated database access code.
-- Use parameterized queries and transactions for changes that must succeed or fail together.
-- Preserve existing challenge history and ratings during migrations. Call out destructive changes and their data consequences before implementation.
-- Add database constraints for established invariants where appropriate, alongside application validation.
-
-### TMDB integration
-
-- Keep TMDB credentials and authenticated API calls on the server.
-- Treat TMDB responses as external input. Handle missing fields, timeouts, rate limits, and API failures without exposing secrets or internal errors.
-- Avoid making access to existing challenge history depend unnecessarily on a successful live TMDB request.
-- Follow existing metadata-storage and caching conventions. Check current TMDB requirements when changing attribution or API usage.
-
-## Development workflow
 Create feature branches from up-to-date `main` and open PRs directly into `main`.
-Use PR titles in the form `<type>(service): summary`, for example
-`feat(watchlist): add viewing services` or `fix(database): preserve existing data during upgrades`.
+Use `<type>(service): summary` titles, such as `feat(watchlist): add viewing services`.
 CI checks PRs and pushes to `main`; test changes in the temporary PR environment
-before merging. There is no staging-branch promotion step.
+before merging. There is no staging promotion step.
 
-Use your judgment and voice concerns when a proposed choice is unsafe, unnecessarily complex, or likely to cause problems. Explain the concrete tradeoff and suggest a simpler or safer alternative. Do not agree reflexively; continue routine work without unnecessary approval requests.
-
-1. Read the relevant code, repository instructions, configuration, and tests before changing behavior. Use documented commands and pinned tool versions; do not invent repository paths or commands.
-2. Implement the smallest coherent change that satisfies the requested task. Avoid unrelated refactoring, formatting churn, or speculative features.
-3. For larger tasks, explain a short sequence of steps before implementation and work incrementally.
-4. Keep the user involved in decisions that materially change architecture, dependencies, project structure, or data flow. Continue routine implementation within the agreed scope without repeatedly asking for confirmation.
-5. Preserve unrelated work already present in the repository. Do not overwrite or revert it to simplify the task.
-6. Update relevant documentation when changing behavior, configuration, setup, or deployment requirements.
+- Format changed Go code with `gofmt` and run relevant checks, including
+  `go test ./...` for Go changes. Test behavior, especially authorization, year
+  isolation, ratings, and data integrity; avoid tests that repeat implementation.
+- For database changes, regenerate affected sqlc output and validate migrations
+  against disposable databases, including upgrades from existing schemas.
+  Never run destructive validation on production.
+- For UI changes, verify affected pages, forms, validation errors, and relevant
+  signed-in and visitor states.
+- For deployment changes, verify both Docker modes: private tunnel ingress,
+  ignored forwarded IP headers in normal mode, and persistent storage in both.
+- Follow the logging and page conventions in DEVELOPMENT.md. Update documentation
+  when behavior, configuration, setup, or deployment requirements change.
+- At completion, summarize changes, checks, and remaining limitations or decisions.
+  Distinguish checks that passed from checks that could not run.
 
 ## Documentation audience
 
-- `README.md` is for self-hosters and people using Screamtober. Focus on what the product does, how to deploy and configure it, and how to use it.
-- Update the README when a change affects those tasks; do not turn it into a feature-by-feature implementation reference or development changelog.
-- Include operational details that help self-hosters run the app reliably, such as required environment variables, persistent storage, backups, upgrades, and actionable troubleshooting.
-- Keep implementation details in relevant developer documentation or code comments. Internal package APIs, database query mechanics, test coverage, and exhaustive log fields or outcome values generally do not belong in the README.
-- Describe logging only to the extent useful for operation: where to find logs, how to set verbosity, and any meaningful privacy considerations. Explain internal logging conventions in developer documentation instead.
-- Prefer concise, task-oriented instructions and examples over explanations of how every feature works internally.
-
-## Validation and completion
-
-- Format changed Go code with `gofmt` and run the repository's relevant checks. If no alternative is documented, use `go test ./...` for Go tests.
-- Add or update focused tests for changed behavior, especially permission enforcement, year isolation, ratings, and data integrity. Do not add tests that only repeat implementation details.
-- For database changes, regenerate affected `sqlc` code and validate migrations against a disposable database, including upgrades from an existing schema when relevant.
-- For UI changes, verify the affected pages and forms, including validation errors and relevant authenticated and unauthenticated states.
-- For deployment changes, verify both Docker modes: tunnel ingress stays private, normal ingress does not trust forwarded IP headers, and database storage remains persistent in both.
-- Never run destructive validation against production data.
-- At completion, summarize what changed, what was checked, and any remaining limitations or decisions. Clearly distinguish checks that passed from checks that could not be run.
+- `README.md`: what the app does, requirements, setup, configuration, use, and
+  essential operations (storage, backups, upgrades, troubleshooting). Keep logging
+  guidance limited to finding logs, verbosity, and privacy when useful to operators.
+- `DEVELOPMENT.md`: developer commands, implementation conventions, and logging
+  details. Keep internal APIs, query mechanics, and test details out of the README.
+- `AGENTS.md`: durable project rules and contributor workflow. Prefer concise,
+  task-oriented guidance; avoid feature changelogs and repeated explanations.
