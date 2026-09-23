@@ -1,7 +1,7 @@
 {{define "movie_ratings"}}
 {{if .Movie.Ratings}}
-<p class="rating">Household rating: {{.Movie.Average}} / 5 ({{len .Movie.Ratings}} {{if eq (len .Movie.Ratings) 1}}rating{{else}}ratings{{end}})</p>
-<ul class="ratings" aria-label="Individual ratings">{{range .Movie.Ratings}}<li><span>{{.DisplayName}}: {{.Score}} / 5</span>{{template "star_row" .}}</li>{{end}}</ul>
+<p class="rating"><b class="rating-average" aria-hidden="true">{{.Movie.Average}}</b><span class="rating-scale" aria-hidden="true">/ 5 · {{len .Movie.Ratings}} {{if eq (len .Movie.Ratings) 1}}rating{{else}}ratings{{end}}</span><span class="visually-hidden">Household rating: {{.Movie.Average}} / 5 ({{len .Movie.Ratings}} {{if eq (len .Movie.Ratings) 1}}rating{{else}}ratings{{end}})</span></p>
+<ul class="ratings" aria-label="Individual ratings">{{range .Movie.Ratings}}<li><span class="visually-hidden">{{.DisplayName}}: {{.Score}} / 5</span><span class="rater" aria-hidden="true">{{.DisplayName}}</span>{{template "star_row" .}}</li>{{end}}</ul>
 {{else}}<p class="rating muted">{{if .Featured}}Nobody has rated this one yet.{{if not .SignedIn}} <a href="/login">Sign in</a> to be the first.{{end}}{{else}}No ratings yet.{{end}}</p>{{end}}
 {{if .SignedIn}}
 <form class="rating-form" method="post" action="/challenges/{{.Year}}/movies/{{.Movie.ID}}/rating">

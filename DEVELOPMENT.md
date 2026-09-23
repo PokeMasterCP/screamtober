@@ -52,7 +52,10 @@ retaining entry IDs. Scope writes to the requested challenge and entry.
 
 Use `site_style.html`, the buffered `renderPage` helper, and `movie_ratings.html`
 for shared rating controls and verdicts. Poster-only carousel cards must retain
-accessible movie names. Keep server-side validation, conflict detection, and
+accessible movie names. Home page summaries (month calendar, countdown, critics,
+top pick, unrated reminders) derive from the challenge's existing movie and rating
+queries; keep them free of extra queries and live TMDB requests. Calendar nights
+use `moviePosterThumbURL` for smaller TMDB images. Keep server-side validation, conflict detection, and
 rollback coverage for calendar arrangement.
 
 Keep `Referrer-Policy: strict-origin`: browsers may omit `Sec-Fetch-Site` on HTTP

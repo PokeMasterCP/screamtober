@@ -108,7 +108,10 @@ Set these environment variables when starting the app; restart it after changes.
    pointer or touch device.
 4. **Watch and rate.** Sign out of admin, then sign in with your personal token.
    Save a 1–5 star rating on a movie card to mark it watched for the household.
-   You can edit your rating later. Everyone can see scores and the household average.
+   You can edit your rating later. Everyone, including visitors, can see each
+   person's scores, the household average, the top-rated pick, and how many
+   movies each person has rated. Signed-in people also see watched movies they
+   have not rated yet.
 5. **Revisit past years.** Use the year links to browse previous challenges.
    Adding a new year's lineup preserves earlier years.
 

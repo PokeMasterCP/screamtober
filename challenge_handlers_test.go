@@ -158,10 +158,14 @@ func TestChallengePosterURLs(t *testing.T) {
 					t.Fatalf("challenge = %d", w.Code)
 				}
 				if tt.want != "" {
-					// Each repeated challenge entry has its own poster; the feature also
-					// reuses its poster as a decorative backdrop.
-					if count := strings.Count(body, `src="`+tt.want+`"`); count != 3 {
-						t.Errorf("poster count = %d, want 3", count)
+					// Each repeated challenge entry has its own poster and calendar
+					// thumbnail; the top-rated entry adds one more thumbnail.
+					if count := strings.Count(body, `src="`+tt.want+`"`); count != 2 {
+						t.Errorf("poster count = %d, want 2", count)
+					}
+					thumb := strings.Replace(tt.want, "/w500/", "/w185/", 1)
+					if count := strings.Count(body, `src="`+thumb+`"`); count != 3 {
+						t.Errorf("thumbnail count = %d, want 3", count)
 					}
 				} else if strings.Contains(body, `src="https://image.tmdb.org/`) {
 					t.Error("missing or invalid path produced a poster URL")
@@ -344,5 +348,52 @@ func TestChallengeNights(t *testing.T) {
 		if want := night.Day == 3; (night.Movie != nil) != want || (want && night.Movie.ID != 7) {
 			t.Fatalf("night %d has wrong movie", night.Day)
 		}
+	}
+}
+
+func TestChallengeHouseholdSummary(t *testing.T) {
+	db := schemaFixture(t)
+	// The member has watched entry 2 but has not rated it; entry 1 keeps both votes.
+	execSchema(t, db, `UPDATE challenge_movies SET watched_at = CURRENT_TIMESTAMP WHERE id IN (1, 2); DELETE FROM ratings WHERE user_id = 2 AND challenge_movie_id = 2`)
+	h := challengeHTTPFixture(t, db)
+	for _, cookie := range []*http.Cookie{nil, loginCookie(t, h)} {
+		body := authRequest(h, "GET", "/challenges/2026", "", cookie).Body.String()
+		// Year totals average only submitted ratings; 2027 votes stay out of 2026.
+		for _, want := range []string{`<b>3.0</b><span>★ · 2 ratings`, `class="top-pick" href="#movie-1"`, `Member</span><span class="critic-stats">1 rated · <b>5.0</b>`, `Owner</span><span class="critic-stats">1 rated · <b>1.0</b>`} {
+			if !strings.Contains(body, want) {
+				t.Fatalf("summary missing %q", want)
+			}
+		}
+		if got := strings.Contains(body, `Your turn.`) && strings.Contains(body, `<li><a href="#movie-2">`); got != (cookie != nil) {
+			t.Fatalf("unrated reminder shown = %v for signed in = %v", got, cookie != nil)
+		}
+	}
+}
+
+func TestChallengeCalendarDates(t *testing.T) {
+	for _, tt := range []struct {
+		now  time.Time
+		days int
+	}{
+		{time.Date(2026, time.September, 23, 23, 30, 0, 0, time.Local), 8},
+		{time.Date(2026, time.September, 30, 0, 0, 0, 0, time.Local), 1},
+		{time.Date(2026, time.October, 1, 0, 0, 0, 0, time.Local), 0},
+		{time.Date(2026, time.December, 31, 0, 0, 0, 0, time.Local), 0},
+		{time.Date(2026, time.March, 1, 0, 0, 0, 0, time.Local), 214},
+	} {
+		if got := daysUntilOctober(tt.now); got != tt.days {
+			t.Errorf("daysUntilOctober(%s) = %d, want %d", tt.now.Format(time.DateOnly), got, tt.days)
+		}
+	}
+	// October 1 fell on a Wednesday in 2025 and a Thursday in 2026.
+	for year, column := range map[int64]int{2025: 4, 2026: 5} {
+		if got := (challengePage{Year: year}).FirstColumn(); got != column {
+			t.Errorf("%d first column = %d, want %d", year, got, column)
+		}
+	}
+	entry := challengeMovieView{}
+	entry.Position = sql.NullInt64{Int64: 5, Valid: true}
+	if got := (challengePage{Year: 2026}).NightLabel(entry); got != "Monday, October 5" {
+		t.Errorf("night label = %q", got)
 	}
 }
