@@ -11,7 +11,7 @@
   <div class="topbar-inner">
     <div class="brand-group"><a class="brand" href="/">Screamtober</a></div>
     <nav class="account" aria-label="Account">
-      {{if .SignedIn}}<span class="user-chip"><span class="user-dot" aria-hidden="true"></span><span>{{.User.DisplayName}}</span></span><form method="post" action="/logout"><button class="secondary small" type="submit">Sign out</button></form>
+      {{if .SignedIn}}<span class="user-chip"><span class="user-initial" aria-hidden="true">{{$.Initial .User.DisplayName}}</span><span>{{.User.DisplayName}}</span></span><form method="post" action="/logout"><button class="secondary small" type="submit">Sign out</button></form>
       {{else}}<a class="button secondary small" href="/login">Sign in</a>{{end}}
     </nav>
   </div>
@@ -20,21 +20,23 @@
   {{if and .Challenge .Movies}}
   {{with .NextMovie}}
   <section class="feature" id="content" aria-labelledby="feature-title">
-    {{if .PosterURL}}<div class="feature-backdrop" aria-hidden="true"><img src="{{.PosterURL}}" alt="" width="500" height="750" decoding="async" referrerpolicy="no-referrer"></div>{{end}}
-    <div class="feature-top"><p class="now-showing">Now showing</p><p class="feature-slot">{{if .Position.Valid}}<span>October</span><b>{{printf "%02d" .Position.Int64}}</b>{{else}}<span>Unscheduled</span>{{end}}{{if $.Tonight}} <span class="tonight">Tonight</span>{{end}}</p></div>
     <div class="feature-layout" id="movie-{{.ID}}">
-      <div class="movie-poster feature-poster" aria-hidden="true"><span>Poster unavailable</span>{{if .PosterURL}}<img src="{{.PosterURL}}" alt="" width="500" height="750" fetchpriority="high" decoding="async" referrerpolicy="no-referrer">{{end}}</div>
+      <div class="feature-poster-wrap">
+        <div class="movie-poster feature-poster" aria-hidden="true"><span>Poster unavailable</span>{{if .PosterURL}}<img src="{{.PosterURL}}" alt="" width="500" height="750" fetchpriority="high" decoding="async" referrerpolicy="no-referrer">{{end}}</div>
+        {{if .Position.Valid}}<p class="date-tag" aria-hidden="true"><span>Oct</span><b>{{printf "%02d" .Position.Int64}}</b></p>{{end}}
+      </div>
       <div class="feature-heading">
+        <p class="kicker"><span class="kicker-live">{{if $.Tonight}}Tonight{{else}}Up next{{end}}</span><span>{{if .Position.Valid}}{{$.NightLabel .}}{{else}}Unscheduled{{end}}</span></p>
         <h1 class="feature-title" id="feature-title">{{.Title}}</h1>
-        {{if .ReleaseDate.Valid}}<p class="feature-release">Released {{.ReleaseDate.String}}</p>{{end}}
         <div class="feature-facts">
+          {{with .ReleaseYear}}<p class="fact"><small>Released</small><span title="{{$.NextMovie.ReleaseDate.String}}">{{.}}</span></p>{{end}}
           {{template "viewing_service" .}}
         </div>
       </div>
       <div class="feature-body">
         {{if .Overview.Valid}}<p class="feature-overview">{{.Overview.String}}</p>{{end}}
         <aside class="feature-rating" aria-label="Ratings for {{.Title}}">
-          <p class="eyebrow">Household verdict</p>
+          <p class="label">Household verdict</p>
           {{template "movie_ratings" ($.RatingPanel . true)}}
         </aside>
       </div>
@@ -42,16 +44,17 @@
   </section>
   {{else}}
   <section class="feature is-done" id="content" aria-labelledby="feature-title">
-    <div class="feature-top"><p class="now-showing">All selected movies watched</p><p class="feature-slot"><b>{{.Challenge.Year}}</b></p></div>
+    <p class="kicker"><span class="kicker-live">That’s a wrap</span><span>{{.Challenge.Year}} · {{.Watched}} of {{len .Movies}} watched</span></p>
     <h1 class="feature-title" id="feature-title">You’re all caught up.</h1>
     <p class="feature-overview">Every movie on this year’s list has been watched. Rate the ones that kept you up at night, or relive the lineup below.</p>
+    {{with .TopMovie}}<p class="wrap-top"><a href="#movie-{{.ID}}">{{if .ThumbURL}}<img src="{{.ThumbURL}}" alt="" width="92" height="138" loading="lazy" decoding="async" referrerpolicy="no-referrer">{{end}}<span><small>Household favorite</small><b>{{.Title}}</b><span>{{.Average}} ★ from {{len .Ratings}} {{if eq (len .Ratings) 1}}rating{{else}}ratings{{end}}</span></span></a></p>{{end}}
     <div class="actions"><a class="button" href="#challenge-heading">Revisit the lineup <span aria-hidden="true">↓</span></a></div>
   </section>
   {{end}}
   {{else}}
   <section class="hero" id="content" aria-label="Welcome">
     <div>
-      <p class="eyebrow">The October movie challenge</p>
+      <p class="kicker"><span class="kicker-live">The October movie challenge</span></p>
       <h1>31 nights.<br>A little <span class="hero-accent">fright.</span></h1>
       <p class="hero-copy">A month of old favorites, new nightmares, and one very good reason to stay in. Welcome to our October watchlist.</p>
       <div class="actions">
@@ -60,29 +63,51 @@
     </div>
     <div class="ticket" aria-hidden="true">
       <span class="ticket-top">Admit one · Oct {{.Year}}</span>
-      <span class="ticket-number">31</span>
-      <div class="ticket-tear"></div>
-      <span class="section-label">Nights of fright<br>Admit the whole household</span>
+      {{if .DaysUntil}}<span class="ticket-number">{{.DaysUntil}}</span><div class="ticket-tear"></div><span class="ticket-label">{{if eq .DaysUntil 1}}Night{{else}}Nights{{end}} until<br>the first scream</span>
+      {{else}}<span class="ticket-number">31</span><div class="ticket-tear"></div><span class="ticket-label">Nights of fright<br>Admit the whole household</span>{{end}}
     </div>
   </section>
   {{end}}
   {{if and .Challenges (not .Challenge)}}{{template "year_nav" .}}{{end}}
   {{if .Challenge}}
-  <section class="lineup" aria-labelledby="challenge-heading">
+  <section class="programme" aria-labelledby="challenge-heading">
     <div class="challenge-heading">
       <div>
-        <p class="eyebrow">31 nights of fright</p>
+        <p class="label">The programme</p>
         <h2 id="challenge-heading">{{.Challenge.Year}} movie challenge</h2>
         <p class="challenge-meta">{{len .Movies}} of 31 movies selected · {{.Watched}} watched</p>
-        {{if .Movies}}<progress class="challenge-progress" value="{{.Watched}}" max="{{len .Movies}}" aria-label="Movies watched">{{.Watched}} of {{len .Movies}}</progress>{{end}}
       </div>
       {{if .Challenges}}{{template "year_nav" .}}{{end}}
     </div>
     {{if .Movies}}
-    <ol class="nights" aria-label="October {{.Challenge.Year}} calendar">
-      {{range $night := .Nights}}<li class="night{{with .Movie}} is-scheduled{{if .WatchedAt.Valid}} is-watched{{end}}{{end}}{{if eq .Day $.Today}} is-today{{end}}">{{with .Movie}}<a href="#movie-{{.ID}}" title="{{.Title}}"><span class="night-weekday" aria-hidden="true">{{$night.Weekday}}</span><span class="night-day">{{$night.Day}}</span><span class="visually-hidden"> October: {{.Title}}{{if .WatchedAt.Valid}}, watched{{end}}{{if eq $night.Day $.Today}}, tonight{{end}}</span></a>{{else}}<span><span class="night-weekday" aria-hidden="true">{{$night.Weekday}}</span><span class="night-day">{{$night.Day}}</span><span class="visually-hidden"> October: no movie{{if eq $night.Day $.Today}}, tonight{{end}}</span></span>{{end}}</li>{{end}}
-    </ol>
-    <ul class="nights-legend" aria-hidden="true"><li>Open night</li><li class="is-scheduled">Picked</li><li class="is-watched">Watched</li></ul>
+    <dl class="stats">
+      <div class="stat"><dt>Watched</dt><dd><b>{{.Watched}}</b><span>/ {{len .Movies}}</span></dd><dd class="stat-meter"><progress value="{{.Watched}}" max="{{len .Movies}}" aria-label="Movies watched">{{.Watched}} of {{len .Movies}}</progress></dd></div>
+      {{if .DaysUntil}}<div class="stat"><dt>Until October</dt><dd><b>{{.DaysUntil}}</b><span>{{if eq .DaysUntil 1}}night{{else}}nights{{end}}</span></dd></div>
+      {{else if .Today}}<div class="stat"><dt>Nights left</dt><dd><b>{{.NightsLeft}}</b><span>of 31</span></dd></div>
+      {{else}}<div class="stat"><dt>Nights picked</dt><dd><b>{{len .Movies}}</b><span>of 31</span></dd></div>{{end}}
+      <div class="stat"><dt>Avg rating</dt><dd>{{if .Average}}<b>{{.Average}}</b><span>★ · {{.RatingCount}} {{if eq .RatingCount 1}}rating{{else}}ratings{{end}}</span>{{else}}<b>—</b><span>No ratings yet</span>{{end}}</dd></div>
+    </dl>
+    <div class="programme-layout">
+      <div class="calendar">
+        <p class="calendar-title" aria-hidden="true">October <span>{{.Challenge.Year}}</span></p>
+        <ol class="weekdays" aria-hidden="true"><li>Sun</li><li>Mon</li><li>Tue</li><li>Wed</li><li>Thu</li><li>Fri</li><li>Sat</li></ol>
+        <ol class="nights" aria-label="October {{.Challenge.Year}} calendar">
+          {{range $night := .Nights}}<li class="night{{with .Movie}} is-scheduled{{if .WatchedAt.Valid}} is-watched{{end}}{{end}}{{if eq .Day $.Today}} is-today{{end}}{{if eq .Day 1}} starts-{{$.FirstColumn}}{{end}}">{{with .Movie}}<a href="#movie-{{.ID}}" title="{{.Title}}">{{if .ThumbURL}}<img src="{{.ThumbURL}}" alt="" width="185" height="278" loading="lazy" decoding="async" referrerpolicy="no-referrer">{{end}}<span class="night-day">{{$night.Day}}</span>{{if .WatchedAt.Valid}}<span class="night-stamp" aria-hidden="true">Seen</span>{{end}}<span class="visually-hidden"> October, {{$night.Weekday}}: {{.Title}}{{if .WatchedAt.Valid}}, watched{{end}}{{if eq $night.Day $.Today}}, tonight{{end}}</span></a>{{else}}<span><span class="night-day">{{$night.Day}}</span><span class="visually-hidden"> October, {{$night.Weekday}}: no movie{{if eq $night.Day $.Today}}, tonight{{end}}</span></span>{{end}}</li>{{end}}
+        </ol>
+        <ul class="nights-legend" aria-hidden="true"><li class="is-scheduled">Coming up</li><li class="is-watched">Seen</li>{{if .Today}}<li class="is-today">Tonight</li>{{end}}</ul>
+        {{with .Unscheduled}}<p class="unscheduled"><span class="label">Unscheduled</span>{{range $i, $m := .}}{{if $i}}<span aria-hidden="true"> · </span>{{end}}<a href="#movie-{{.ID}}">{{.Title}}</a>{{end}}</p>{{end}}
+      </div>
+      <aside class="critics" aria-labelledby="critics-heading">
+        <h3 id="critics-heading" class="label">Critics’ corner</h3>
+        {{if .ToRate}}<div class="to-rate"><p><b>Your turn.</b> You’ve watched {{len .ToRate}} {{if eq (len .ToRate) 1}}movie{{else}}movies{{end}} without rating {{if eq (len .ToRate) 1}}it{{else}}them{{end}}.</p><ul>{{range .ToRate}}<li><a href="#movie-{{.ID}}">{{.Title}}</a></li>{{end}}</ul></div>{{end}}
+        {{with .TopMovie}}<a class="top-pick" href="#movie-{{.ID}}"><span class="top-pick-poster" aria-hidden="true">{{if .ThumbURL}}<img src="{{.ThumbURL}}" alt="" width="92" height="138" loading="lazy" decoding="async" referrerpolicy="no-referrer">{{end}}</span><span><small>Top rated</small><b>{{.Title}}</b><span>{{.Average}} ★ · {{len .Ratings}} {{if eq (len .Ratings) 1}}rating{{else}}ratings{{end}}</span></span></a>{{end}}
+        {{if .Critics}}
+        <ol class="critic-list" aria-label="Ratings by person">
+          {{range .Critics}}<li><span class="critic-initial" aria-hidden="true">{{$.Initial .Name}}</span><span class="critic-name">{{.Name}}</span><span class="critic-stats">{{.Count}} rated · <b>{{.Average}}</b> avg</span></li>{{end}}
+        </ol>
+        {{else}}<p class="muted critics-empty">No verdicts yet. Ratings show up here as the household weighs in.</p>{{end}}
+      </aside>
+    </div>
     {{end}}
     {{if .Lineup}}
     <div class="lineup-bar">
@@ -101,7 +126,7 @@
           <div class="movie-poster" aria-hidden="true"><span>Poster unavailable</span>{{if .PosterURL}}<img src="{{.PosterURL}}" alt="" width="500" height="750" loading="lazy" decoding="async" referrerpolicy="no-referrer">{{end}}</div>
           <div class="movie-meta">
             <span class="slot">{{if .Position.Valid}}<span class="slot-month">Oct</span><span class="slot-day">{{printf "%02d" .Position.Int64}}</span>{{else}}<span class="slot-month">Unscheduled</span>{{end}}</span>
-            {{if .WatchedAt.Valid}}<span class="badge watched">Watched</span>{{else}}<span class="visually-hidden">Unwatched</span>{{end}}
+            {{if .WatchedAt.Valid}}<span class="badge watched">Seen</span>{{else}}<span class="visually-hidden">Unwatched</span>{{end}}
           </div>
           <div class="movie-card-content">
             {{template "viewing_service" .}}
@@ -114,18 +139,18 @@
       {{end}}
     </ol>
     {{else if .Movies}}
-    <p class="challenge-meta">Your only pick is featured above. More movie nights to come.</p>
+    <p class="challenge-meta lineup-note">Your only pick is featured above. More movie nights to come.</p>
     {{else}}
-    <div class="empty-state"><p class="eyebrow">Coming soon</p><h2>The lineup is still in the making.</h2><p>No movies selected for this year yet.</p><p>Check back for our October picks.</p></div>
+    <div class="empty-state"><p class="label">Coming soon</p><h2>The lineup is still in the making.</h2><p>No movies selected for this year yet.</p><p>Check back for our October picks.</p></div>
     {{end}}
   </section>
   {{else}}
-  <section class="empty-state" aria-labelledby="empty-heading"><p class="eyebrow">{{.Year}} movie challenge</p><h2 id="empty-heading">The lineup is still in the making.</h2><p>No movies selected for this year yet.</p><p>Check back for our October picks.</p></section>
+  <section class="empty-state" aria-labelledby="empty-heading"><p class="label">{{.Year}} movie challenge</p><h2 id="empty-heading">The lineup is still in the making.</h2><p>No movies selected for this year yet.</p><p>Check back for our October picks.</p></section>
   {{end}}
   {{template "site_footer"}}
 </main>
 <script>
-document.querySelectorAll('.movie-poster img').forEach(img => {
+document.querySelectorAll('.movie-poster img, .nights img, .top-pick img, .wrap-top img').forEach(img => {
   img.addEventListener('error', () => img.remove());
   if (img.complete && !img.naturalWidth) img.remove();
 });
@@ -173,9 +198,9 @@ if (carousel) {
       carousel.scrollTo({ left: event.key === 'Home' ? 0 : carousel.scrollWidth, behavior: reducedMotion.matches ? 'instant' : 'smooth' });
     }
   });
-  // Calendar links keep native fragment navigation; this also brings the card
-  // fully into the carousel instead of leaving it partly off-screen.
-  document.querySelectorAll('.nights a').forEach(link => link.addEventListener('click', () => {
+  // Links into the lineup keep native fragment navigation; this also brings the
+  // card fully into the carousel instead of leaving it partly off-screen.
+  document.querySelectorAll('a[href^="#movie-"]').forEach(link => link.addEventListener('click', () => {
     const card = carousel.querySelector(link.hash);
     if (card) requestAnimationFrame(() => card.scrollIntoView({ block: 'start', inline: 'start', behavior: reducedMotion.matches ? 'instant' : 'smooth' }));
   }));
@@ -188,7 +213,7 @@ if (carousel) {
 </html>
 {{define "year_nav"}}
 <nav class="year-nav" aria-label="Challenge years">
-  <span class="section-label">Challenge year</span>
+  <span class="label">Challenge year</span>
   <ul>{{range .Challenges}}<li><a href="/challenges/{{.Year}}"{{if eq .Year $.Year}} aria-current="page"{{end}}>{{.Year}}</a></li>{{end}}</ul>
 </nav>
 {{end}}
