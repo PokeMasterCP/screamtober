@@ -20,43 +20,32 @@
   {{if and .Challenge .Movies}}
   {{with .NextMovie}}
   <section class="feature" id="content" aria-labelledby="feature-title">
-    <div class="feature-top">
-      <p class="now-showing">Now showing · Up next</p>
-      <p class="feature-slot">{{if .Position.Valid}}<span>October</span><b>{{printf "%02d" .Position.Int64}}</b>{{else}}<span>Unscheduled</span>{{end}}{{if $.Tonight}}<span class="tonight">Tonight</span>{{end}}</p>
-    </div>
+    {{if .PosterURL}}<div class="feature-backdrop" aria-hidden="true"><img src="{{.PosterURL}}" alt="" width="500" height="750" decoding="async" referrerpolicy="no-referrer"></div>{{end}}
+    <div class="feature-top"><p class="now-showing">Now showing</p><p class="feature-slot">{{if .Position.Valid}}<span>October</span><b>{{printf "%02d" .Position.Int64}}</b>{{else}}<span>Unscheduled</span>{{end}}{{if $.Tonight}} <span class="tonight">Tonight</span>{{end}}</p></div>
     <div class="feature-layout" id="movie-{{.ID}}">
       <div class="movie-poster feature-poster" aria-hidden="true"><span>Poster unavailable</span>{{if .PosterURL}}<img src="{{.PosterURL}}" alt="" width="500" height="750" fetchpriority="high" decoding="async" referrerpolicy="no-referrer">{{end}}</div>
-      <div class="feature-details">
-        <div class="feature-title-wrap">
-          <p class="feature-kicker">Featured movie</p>
-          <h1 class="feature-title" id="feature-title">{{.Title}}</h1>
+      <div class="feature-heading">
+        <h1 class="feature-title" id="feature-title">{{.Title}}</h1>
+        {{if .ReleaseDate.Valid}}<p class="feature-release">Released {{.ReleaseDate.String}}</p>{{end}}
+        <div class="feature-facts">
           {{template "viewing_service" .}}
-          {{if .ReleaseDate.Valid}}<ul class="feature-meta"><li>Released {{.ReleaseDate.String}}</li></ul>{{end}}
         </div>
-        <div class="feature-body">
-          <div>
-            {{if .Overview.Valid}}<p class="feature-overview">{{.Overview.String}}</p>{{end}}
-          </div>
-          <aside class="feature-aside" aria-label="Ratings for {{.Title}}">
-            <div class="feature-rating">
-              <p class="eyebrow">Household verdict</p>
-              {{template "movie_ratings" ($.RatingPanel . true)}}
-            </div>
-          </aside>
-        </div>
+      </div>
+      <div class="feature-body">
+        {{if .Overview.Valid}}<p class="feature-overview">{{.Overview.String}}</p>{{end}}
+        <aside class="feature-rating" aria-label="Ratings for {{.Title}}">
+          <p class="eyebrow">Household verdict</p>
+          {{template "movie_ratings" ($.RatingPanel . true)}}
+        </aside>
       </div>
     </div>
   </section>
   {{else}}
   <section class="feature is-done" id="content" aria-labelledby="feature-title">
-    <div class="feature-top"><p class="now-showing">All selected movies watched</p><p class="feature-slot"><span>{{.Challenge.Year}}</span></p></div>
+    <div class="feature-top"><p class="now-showing">All selected movies watched</p><p class="feature-slot"><b>{{.Challenge.Year}}</b></p></div>
     <h1 class="feature-title" id="feature-title">You’re all caught up.</h1>
-    <div class="feature-body">
-      <div>
-        <p class="feature-overview">Every movie on this year’s list has been watched. Rate the ones that kept you up at night, or relive the lineup below.</p>
-        <div class="actions"><a class="button" href="#challenge-heading">Revisit the lineup <span aria-hidden="true">↓</span></a></div>
-      </div>
-    </div>
+    <p class="feature-overview">Every movie on this year’s list has been watched. Rate the ones that kept you up at night, or relive the lineup below.</p>
+    <div class="actions"><a class="button" href="#challenge-heading">Revisit the lineup <span aria-hidden="true">↓</span></a></div>
   </section>
   {{end}}
   {{else}}
@@ -77,40 +66,44 @@
     </div>
   </section>
   {{end}}
-  {{if .Challenges}}
-  <nav class="year-nav" aria-label="Challenge years">
-    <span class="section-label">Challenge year</span>
-    <ul>{{range .Challenges}}<li><a href="/challenges/{{.Year}}"{{if eq .Year $.Year}} aria-current="page"{{end}}>{{.Year}}</a></li>{{end}}</ul>
-  </nav>
-  {{end}}
+  {{if and .Challenges (not .Challenge)}}{{template "year_nav" .}}{{end}}
   {{if .Challenge}}
   <section class="lineup" aria-labelledby="challenge-heading">
     <div class="challenge-heading">
       <div>
-        <p class="eyebrow">{{if .NextMovie}}The rest of the lineup{{else}}The lineup{{end}}</p>
+        <p class="eyebrow">31 nights of fright</p>
         <h2 id="challenge-heading">{{.Challenge.Year}} movie challenge</h2>
         <p class="challenge-meta">{{len .Movies}} of 31 movies selected · {{.Watched}} watched</p>
+        {{if .Movies}}<progress class="challenge-progress" value="{{.Watched}}" max="{{len .Movies}}" aria-label="Movies watched">{{.Watched}} of {{len .Movies}}</progress>{{end}}
       </div>
-      {{if .Lineup}}
+      {{if .Challenges}}{{template "year_nav" .}}{{end}}
+    </div>
+    {{if .Movies}}
+    <ol class="nights" aria-label="October {{.Challenge.Year}} calendar">
+      {{range $night := .Nights}}<li class="night{{with .Movie}} is-scheduled{{if .WatchedAt.Valid}} is-watched{{end}}{{end}}{{if eq .Day $.Today}} is-today{{end}}">{{with .Movie}}<a href="#movie-{{.ID}}" title="{{.Title}}"><span class="night-weekday" aria-hidden="true">{{$night.Weekday}}</span><span class="night-day">{{$night.Day}}</span><span class="visually-hidden"> October: {{.Title}}{{if .WatchedAt.Valid}}, watched{{end}}{{if eq $night.Day $.Today}}, tonight{{end}}</span></a>{{else}}<span><span class="night-weekday" aria-hidden="true">{{$night.Weekday}}</span><span class="night-day">{{$night.Day}}</span><span class="visually-hidden"> October: no movie{{if eq $night.Day $.Today}}, tonight{{end}}</span></span>{{end}}</li>{{end}}
+    </ol>
+    <ul class="nights-legend" aria-hidden="true"><li>Open night</li><li class="is-scheduled">Picked</li><li class="is-watched">Watched</li></ul>
+    {{end}}
+    {{if .Lineup}}
+    <div class="lineup-bar">
+      <h3>{{if .NextMovie}}The rest of the lineup{{else}}The lineup{{end}}</h3>
       <div class="carousel-navigation" hidden>
         <span class="carousel-position" aria-live="polite" aria-atomic="true"></span>
         <button class="secondary carousel-arrow" type="button" data-carousel-step="-1" aria-label="Previous movies" aria-controls="challenge-carousel"><span aria-hidden="true">←</span></button>
         <button class="secondary carousel-arrow" type="button" data-carousel-step="1" aria-label="Next movies" aria-controls="challenge-carousel"><span aria-hidden="true">→</span></button>
       </div>
-      {{end}}
     </div>
-    {{if .Lineup}}
-    <p class="carousel-hint" id="carousel-hint">Swipe or scroll to explore the movies. Use the arrow keys when the lineup is focused.</p>
+    <p class="visually-hidden" id="carousel-hint">Swipe or scroll to explore the movies. Use the arrow keys when the lineup is focused.</p>
     <ol class="watchlist" id="challenge-carousel" role="list" tabindex="0" aria-label="{{if .NextMovie}}Other movies in the{{else}}Movies in the{{end}} {{.Year}} challenge" aria-describedby="carousel-hint">
       {{range .Lineup}}
       <li{{if .Position.Valid}} value="{{.Position.Int64}}"{{end}}>
         <article id="movie-{{.ID}}" class="movie-card{{if .WatchedAt.Valid}} is-watched{{end}}" aria-label="{{.Title}}">
           <div class="movie-poster" aria-hidden="true"><span>Poster unavailable</span>{{if .PosterURL}}<img src="{{.PosterURL}}" alt="" width="500" height="750" loading="lazy" decoding="async" referrerpolicy="no-referrer">{{end}}</div>
+          <div class="movie-meta">
+            <span class="slot">{{if .Position.Valid}}<span class="slot-month">Oct</span><span class="slot-day">{{printf "%02d" .Position.Int64}}</span>{{else}}<span class="slot-month">Unscheduled</span>{{end}}</span>
+            {{if .WatchedAt.Valid}}<span class="badge watched">Watched</span>{{else}}<span class="visually-hidden">Unwatched</span>{{end}}
+          </div>
           <div class="movie-card-content">
-            <div class="movie-meta">
-              <span class="slot">{{if .Position.Valid}}<span class="slot-month">October</span><span class="slot-day">{{printf "%02d" .Position.Int64}}</span>{{else}}<span class="slot-month">Unscheduled</span><span class="slot-day" aria-hidden="true">—</span>{{end}}</span>
-              {{if .WatchedAt.Valid}}<span class="badge watched">Seen</span>{{else}}<span class="badge">Unwatched</span>{{end}}
-            </div>
             {{template "viewing_service" .}}
             <div class="movie-verdict">
               {{template "movie_ratings" ($.RatingPanel . false)}}
@@ -180,6 +173,12 @@ if (carousel) {
       carousel.scrollTo({ left: event.key === 'Home' ? 0 : carousel.scrollWidth, behavior: reducedMotion.matches ? 'instant' : 'smooth' });
     }
   });
+  // Calendar links keep native fragment navigation; this also brings the card
+  // fully into the carousel instead of leaving it partly off-screen.
+  document.querySelectorAll('.nights a').forEach(link => link.addEventListener('click', () => {
+    const card = carousel.querySelector(link.hash);
+    if (card) requestAnimationFrame(() => card.scrollIntoView({ block: 'start', inline: 'start', behavior: reducedMotion.matches ? 'instant' : 'smooth' }));
+  }));
   carousel.addEventListener('scroll', updateNavigation, { passive: true });
   new ResizeObserver(updateNavigation).observe(carousel);
   updateNavigation();
@@ -187,3 +186,9 @@ if (carousel) {
 </script>
 </body>
 </html>
+{{define "year_nav"}}
+<nav class="year-nav" aria-label="Challenge years">
+  <span class="section-label">Challenge year</span>
+  <ul>{{range .Challenges}}<li><a href="/challenges/{{.Year}}"{{if eq .Year $.Year}} aria-current="page"{{end}}>{{.Year}}</a></li>{{end}}</ul>
+</nav>
+{{end}}
