@@ -158,9 +158,10 @@ func TestChallengePosterURLs(t *testing.T) {
 					t.Fatalf("challenge = %d", w.Code)
 				}
 				if tt.want != "" {
-					// Each repeated challenge entry has its own poster, including the feature.
-					if count := strings.Count(body, `src="`+tt.want+`"`); count != 2 {
-						t.Errorf("poster count = %d, want 2", count)
+					// Each repeated challenge entry has its own poster; the feature also
+					// reuses its poster as a decorative backdrop.
+					if count := strings.Count(body, `src="`+tt.want+`"`); count != 3 {
+						t.Errorf("poster count = %d, want 3", count)
 					}
 				} else if strings.Contains(body, `src="https://image.tmdb.org/`) {
 					t.Error("missing or invalid path produced a poster URL")
@@ -208,12 +209,12 @@ func TestHomeCurrentYearAndNextMovie(t *testing.T) {
 	for _, scenario := range []struct {
 		name, setup, want, absent string
 	}{
-		{"missing year", "", "The lineup is still in the making.", "Up next"},
-		{"empty year", "INSERT INTO challenges (id, year) VALUES (3, ?)", "The lineup is still in the making.", "Up next"},
+		{"missing year", "", "The lineup is still in the making.", `class="feature-layout"`},
+		{"empty year", "INSERT INTO challenges (id, year) VALUES (3, ?)", "The lineup is still in the making.", `class="feature-layout"`},
 		{"scheduled before unscheduled", "", `class="feature-layout" id="movie-5"`, "You’re all caught up."},
 		{"skip watched", "UPDATE challenge_movies SET watched_at = CURRENT_TIMESTAMP WHERE id = 5", `class="feature-layout" id="movie-6"`, "You’re all caught up."},
 		{"unscheduled next", "UPDATE challenge_movies SET watched_at = CURRENT_TIMESTAMP WHERE id IN (5,6)", `class="feature-layout" id="movie-4"`, "You’re all caught up."},
-		{"all watched", "UPDATE challenge_movies SET watched_at = CURRENT_TIMESTAMP WHERE challenge_id = 3", "You’re all caught up.", "Up next"},
+		{"all watched", "UPDATE challenge_movies SET watched_at = CURRENT_TIMESTAMP WHERE challenge_id = 3", "You’re all caught up.", `class="feature-layout"`},
 	} {
 		t.Run(scenario.name, func(t *testing.T) {
 			db := schemaFixture(t)
@@ -324,6 +325,24 @@ func TestCarouselPosterCards(t *testing.T) {
 		}
 		if strings.Contains(card, `action="/challenges/2026/movies/2/rating"`) != (cookie != nil) {
 			t.Fatal("wrong per-entry rating controls")
+		}
+	}
+}
+
+func TestChallengeNights(t *testing.T) {
+	var scheduled, unscheduled challengeMovieView
+	scheduled.ID, scheduled.Position = 7, sql.NullInt64{Int64: 3, Valid: true}
+	unscheduled.ID = 8
+	nights := challengePage{Year: 2026, Movies: []challengeMovieView{unscheduled, scheduled}}.Nights()
+	if len(nights) != 31 || nights[0].Day != 1 || nights[30].Day != 31 {
+		t.Fatalf("nights = %d, want October 1–31", len(nights))
+	}
+	if nights[0].Weekday != "Thu" || nights[30].Weekday != "Sat" {
+		t.Fatalf("weekdays = %s…%s, want the challenge year's calendar", nights[0].Weekday, nights[30].Weekday)
+	}
+	for _, night := range nights {
+		if want := night.Day == 3; (night.Movie != nil) != want || (want && night.Movie.ID != 7) {
+			t.Fatalf("night %d has wrong movie", night.Day)
 		}
 	}
 }

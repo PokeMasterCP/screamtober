@@ -28,6 +28,8 @@ type challengePage struct {
 	NextMovie  *challengeMovieView
 	// Tonight is true when the next movie is scheduled for today's October date.
 	Tonight bool
+	// Today is the October day of the selected year's challenge, or 0 outside it.
+	Today   int64
 	Movies  []challengeMovieView
 	Lineup  []challengeMovieView
 	Watched int
@@ -131,7 +133,10 @@ func (h *challengeHandler) render(w http.ResponseWriter, r *http.Request, challe
 			}
 		}
 		now := time.Now()
-		if data.NextMovie != nil && now.Month() == time.October && int64(now.Year()) == selected.Year && data.NextMovie.Position.Valid && data.NextMovie.Position.Int64 == int64(now.Day()) {
+		if now.Month() == time.October && int64(now.Year()) == selected.Year {
+			data.Today = int64(now.Day())
+		}
+		if data.NextMovie != nil && data.Today != 0 && data.NextMovie.Position.Valid && data.NextMovie.Position.Int64 == data.Today {
 			data.Tonight = true
 		}
 	}
@@ -154,3 +159,24 @@ func (p challengePage) RatingPanel(movie challengeMovieView, featured bool) rati
 }
 
 func (ratingPanel) Scores() []int64 { return []int64{1, 2, 3, 4, 5} }
+
+type challengeNight struct {
+	Day     int64
+	Weekday string
+	Movie   *challengeMovieView
+}
+
+// Nights places scheduled entries on the challenge year's 31 October dates.
+func (p challengePage) Nights() []challengeNight {
+	nights := make([]challengeNight, 31)
+	for i := range nights {
+		day := time.Date(int(p.Year), time.October, i+1, 0, 0, 0, 0, time.UTC)
+		nights[i] = challengeNight{Day: int64(i + 1), Weekday: day.Weekday().String()[:3]}
+	}
+	for i := range p.Movies {
+		if position := p.Movies[i].Position; position.Valid && position.Int64 >= 1 && position.Int64 <= 31 {
+			nights[position.Int64-1].Movie = &p.Movies[i]
+		}
+	}
+	return nights
+}

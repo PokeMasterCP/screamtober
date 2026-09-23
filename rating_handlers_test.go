@@ -51,7 +51,7 @@ func TestRatingCreateEditAndPublicCards(t *testing.T) {
 		if strings.Contains(body, `class="rating-form"`) != (c != nil) {
 			t.Fatal("wrong rating controls")
 		}
-		if c != nil && !strings.Contains(body, `<option value="3" selected>3 stars</option>`) {
+		if c != nil && !strings.Contains(body, `name="score" value="3" checked`) {
 			t.Fatal("own rating not selected")
 		}
 	}
