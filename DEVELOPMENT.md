@@ -77,7 +77,9 @@ Write structured JSON. Each HTTP request produces one `http request` completion
 record with request ID, client IP, method, path, matched `route`, status,
 duration, and response size. Handlers add to that record synchronously with the
 helpers in `request_logging.go`; never log a request separately. Independent
-startup and lifecycle events get their own records.
+startup and lifecycle events get their own records: `database initialized` lists
+applied migrations and the schema version, and `starting server` reports
+non-secret settings.
 
 - `startEvent` names the operation as `noun.verb` (such as `rating.save` or
   `user.disable`; sign-in is `login`). Page views stay unnamed.

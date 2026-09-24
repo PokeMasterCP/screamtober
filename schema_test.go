@@ -12,7 +12,7 @@ import (
 
 func schemaFixture(t *testing.T) *sql.DB {
 	t.Helper()
-	db, err := openDatabase(context.Background(), filepath.Join(t.TempDir(), "schema.db"))
+	db, _, err := openDatabase(context.Background(), filepath.Join(t.TempDir(), "schema.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +118,7 @@ func TestDeleteEntryCascadesOnlyItsRatings(t *testing.T) {
 func TestSchemaRollbackAndRebuild(t *testing.T) {
 	ctx := context.Background()
 	path := filepath.Join(t.TempDir(), "upgrade.db")
-	db, err := openDatabase(ctx, path)
+	db, _, err := openDatabase(ctx, path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +141,7 @@ func TestSchemaRollbackAndRebuild(t *testing.T) {
 	if err := db.Close(); err != nil {
 		t.Fatal(err)
 	}
-	db, err = openDatabase(ctx, path)
+	db, _, err = openDatabase(ctx, path)
 	if err != nil {
 		t.Fatal(err)
 	}

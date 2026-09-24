@@ -83,7 +83,7 @@ func TestViewingServiceUpgradePreservesExistingData(t *testing.T) {
 	}
 	// Exercise the same startup upgrade used by production, twice for idempotence.
 	for range 2 {
-		db, err = openDatabase(ctx, path)
+		db, _, err = openDatabase(ctx, path)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -98,7 +98,7 @@ func TestViewingServiceUpgradePreservesExistingData(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	db, err = openDatabase(ctx, path)
+	db, _, err = openDatabase(ctx, path)
 	if err != nil {
 		t.Fatal(err)
 	}

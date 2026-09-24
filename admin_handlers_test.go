@@ -31,7 +31,7 @@ func portalFixture(t *testing.T, db *sql.DB) (*auth, http.Handler) {
 	t.Helper()
 	if db == nil {
 		var err error
-		db, err = openDatabase(context.Background(), filepath.Join(t.TempDir(), "portal.db"))
+		db, _, err = openDatabase(context.Background(), filepath.Join(t.TempDir(), "portal.db"))
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -141,7 +141,9 @@ database before relying on a backup.
 
 To upgrade, back up first, pull the latest source, rebuild the image, and recreate
 the container with the same settings and data volume. Database updates apply
-automatically at startup. Never delete or recreate the database to upgrade.
+automatically at startup; the `database initialized` log entry lists any
+`migrations_applied` and the resulting `schema_version`. Never delete or recreate
+the database to upgrade.
 
 If the app fails to start, check `docker logs screamtober` for configuration or
 storage errors. Keep logs private; they can include movie search titles.

@@ -21,7 +21,7 @@ import (
 )
 
 func TestAddMovieFromSearch(t *testing.T) {
-	db, err := openDatabase(context.Background(), filepath.Join(t.TempDir(), "catalog.db"))
+	db, _, err := openDatabase(context.Background(), filepath.Join(t.TempDir(), "catalog.db"))
 	if err != nil {
 		t.Fatal(err)
 	}

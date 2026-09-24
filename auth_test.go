@@ -101,7 +101,7 @@ func TestLoginLogging(t *testing.T) {
 
 func authFixture(t *testing.T, token string, insecure bool) (*auth, http.Handler) {
 	t.Helper()
-	db, err := openDatabase(context.Background(), filepath.Join(t.TempDir(), "auth.db"))
+	db, _, err := openDatabase(context.Background(), filepath.Join(t.TempDir(), "auth.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
