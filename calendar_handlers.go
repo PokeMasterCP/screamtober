@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -35,15 +34,16 @@ func calendarRevision(movies []store.ListChallengeMoviesRow) string {
 }
 
 func calendarYear(w http.ResponseWriter, r *http.Request) (int64, bool) {
-	raw := r.URL.Query().Get("year")
-	if raw == "" {
-		return int64(time.Now().Year()), true
+	year, ok := int64(time.Now().Year()), true
+	if raw := r.URL.Query().Get("year"); raw != "" {
+		year, ok = parseYear(raw)
 	}
-	year, ok := parseYear(raw)
 	if !ok {
+		eventRejected(r, "invalid_year")
 		http.Error(w, "Choose a year between 1 and 9999.", http.StatusBadRequest)
 		return 0, false
 	}
+	addEventAttrs(r, "year", year)
 	return year, true
 }
 
@@ -55,8 +55,8 @@ func (h *adminHandler) calendar(w http.ResponseWriter, r *http.Request) {
 	h.showCalendar(w, r, year, http.StatusOK, "")
 }
 
-func (h *adminHandler) calendarFailure(w http.ResponseWriter, r *http.Request, err error) {
-	setRequestEvent(r, slog.LevelError, "arrange challenge failed", "error", err)
+func (h *adminHandler) calendarFailure(w http.ResponseWriter, r *http.Request, step string, err error) {
+	eventFailed(r, step, err)
 	http.Error(w, "Unable to arrange movies. Please try again later.", http.StatusInternalServerError)
 }
 
@@ -71,7 +71,7 @@ func (h *adminHandler) showCalendar(w http.ResponseWriter, r *http.Request, year
 		movies, err = h.queries.ListChallengeMovies(r.Context(), challenge.ID)
 	}
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		h.calendarFailure(w, r, err)
+		h.calendarFailure(w, r, "load arrangement", err)
 		return
 	}
 	data.Revision = calendarRevision(movies)
@@ -86,12 +86,14 @@ var errCalendarConflict = errors.New("calendar changed")
 var errCalendarInvalid = errors.New("invalid arrangement")
 
 func (h *adminHandler) saveCalendar(w http.ResponseWriter, r *http.Request) {
+	startEvent(r, "calendar.save")
 	year, ok := calendarYear(w, r)
 	if !ok {
 		return
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 8192)
 	if err := r.ParseForm(); err != nil {
+		eventRejected(r, "invalid_form")
 		h.showCalendar(w, r, year, 400, "The form could not be read. Please try again.")
 		return
 	}
@@ -104,15 +106,18 @@ func (h *adminHandler) saveCalendar(w http.ResponseWriter, r *http.Request) {
 	})
 	switch {
 	case errors.Is(err, errCalendarConflict):
+		eventRejected(r, "stale_revision")
 		h.showCalendar(w, r, year, 409, "This lineup changed in another tab. The latest saved arrangement is shown; please arrange it again.")
 	case errors.Is(err, errCalendarInvalid):
+		eventRejected(r, "invalid_arrangement")
 		h.showCalendar(w, r, year, 400, "Choose a different day from 1–31 for each movie, or leave it unscheduled. No changes were saved; the saved arrangement is shown.")
 	case errors.Is(err, sql.ErrNoRows):
+		eventRejected(r, "no_challenge")
 		h.showCalendar(w, r, year, 404, "Add movies to this year before arranging them.")
 	case err != nil:
-		h.calendarFailure(w, r, err)
+		h.calendarFailure(w, r, "save arrangement", err)
 	default:
-		setRequestEvent(r, slog.LevelInfo, "challenge arranged", "year", year)
+		eventSucceeded(r)
 		http.Redirect(w, r, fmt.Sprintf("/admin/calendar?year=%d&saved=1", year), http.StatusSeeOther)
 	}
 }

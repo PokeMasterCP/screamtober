@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
-	"log/slog"
 	"net/http"
 	"sort"
 	"strings"
@@ -90,8 +89,10 @@ func (h *challengeHandler) byYear(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	addEventAttrs(r, "year", year)
 	challenge, err := h.queries.GetChallengeByYear(r.Context(), year)
 	if errors.Is(err, sql.ErrNoRows) {
+		eventRejected(r, "not_found")
 		http.NotFound(w, r)
 		return
 	}
@@ -216,8 +217,8 @@ func daysUntilOctober(now time.Time) int {
 	return int(october.Sub(today).Hours() / 24)
 }
 
-func (h *challengeHandler) fail(w http.ResponseWriter, r *http.Request, operation string, err error) {
-	setRequestEvent(r, slog.LevelError, "load challenge failed", "operation", operation, "error", err)
+func (h *challengeHandler) fail(w http.ResponseWriter, r *http.Request, step string, err error) {
+	eventFailed(r, step, err)
 	http.Error(w, "Unable to load challenge. Please try again later.", http.StatusInternalServerError)
 }
 

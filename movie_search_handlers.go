@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -73,6 +72,7 @@ func (h *movieSearchHandler) search(w http.ResponseWriter, r *http.Request) {
 	}
 	status := http.StatusOK
 	if data.Year >= 1 && data.Year <= 9999 {
+		addEventAttrs(r, "year", data.Year)
 		switch {
 		case r.URL.Query().Get("deleted") == "1":
 			data.Notice = fmt.Sprintf("The movie was deleted from %d. Its ratings were removed; the catalog record remains available.", data.Year)
@@ -85,39 +85,50 @@ func (h *movieSearchHandler) search(w http.ResponseWriter, r *http.Request) {
 		page, _ = strconv.Atoi(raw)
 	}
 	if r.URL.Query().Has("q") {
+		startEvent(r, "movie.search")
 		if data.Year < 1 || data.Year > 9999 || page < 1 || page > movieSearchMaxPage || data.Query == "" || !utf8.ValidString(data.Query) || utf8.RuneCountInString(data.Query) > 200 {
 			data.Error = fmt.Sprintf("Enter a movie title between 1 and 200 characters, a year between 1 and 9999, and a page between 1 and %d.", movieSearchMaxPage)
 			status = http.StatusBadRequest
-			setRequestEvent(r, slog.LevelWarn, "movie search", "outcome", "invalid_query")
+			eventRejected(r, "invalid_query")
 		} else {
+			addEventAttrs(r, "search_term", data.Query, "page", page)
 			upstreamPage := (page + 1) / 2
 			offset := ((page - 1) % 2) * movieSearchPageSize
 			session, _ := cookieKey(r, adminSessionCookie)
 			entry, cached := h.cache.find(session, data.Query, upstreamPage)
 			var err error
-			if !cached {
+			if cached {
+				addEventAttrs(r, "tmdb_cache", "hit")
+			} else {
 				// Leave time to render within the server's ten-second write timeout.
 				ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
+				started := time.Now()
 				var results tmdb.SearchResults
 				results, err = h.movies.SearchMovies(ctx, data.Query, tmdb.SearchOptions{Page: upstreamPage})
 				cancel()
+				addEventAttrs(r, "tmdb_cache", "miss", "tmdb_ms", float64(time.Since(started))/float64(time.Millisecond))
 				entry = cachedMovieSearch{session: session, query: data.Query, results: results, expires: time.Now().Add(searchCacheTTL)}
 			}
 			if err != nil {
 				status = http.StatusBadGateway
 				data.Error = "Movie search is unavailable right now. Please try again later."
-				outcome := "upstream_failure"
+				reason := "upstream_error"
 				switch {
 				case errors.Is(err, tmdb.ErrNotConfigured):
 					status = http.StatusServiceUnavailable
 					data.Error = "Movie search is not configured. Set TMDB_API_KEY on the server and restart the app."
-					outcome = "not_configured"
+					reason = "not_configured"
 				case errors.Is(err, tmdb.ErrRateLimited):
 					status = http.StatusServiceUnavailable
 					data.Error = "TMDB is busy. Please wait a moment before searching again."
-					outcome = "rate_limited"
+					reason = "rate_limited"
+				case errors.Is(err, tmdb.ErrUnauthorized):
+					reason = "unauthorized"
+				case errors.Is(err, context.DeadlineExceeded):
+					reason = "timeout"
 				}
-				setRequestEvent(r, slog.LevelWarn, "movie search", "outcome", outcome, "search_term", data.Query)
+				// TMDB client errors never include the API key.
+				eventFailed(r, "search tmdb", err, "reason", reason)
 			} else {
 				results := entry.results
 				data.Searched = true
@@ -145,7 +156,7 @@ func (h *movieSearchHandler) search(w http.ResponseWriter, r *http.Request) {
 					data.Next = link(page + 1)
 				}
 
-				setRequestEvent(r, slog.LevelInfo, "movie search", "outcome", "success", "search_term", data.Query)
+				eventSucceeded(r, "result_count", len(data.Results))
 			}
 		}
 	}
@@ -176,16 +187,12 @@ func (h *movieSearchHandler) loadCurrent(ctx context.Context, data *movieSearchP
 func (h *movieSearchHandler) render(w http.ResponseWriter, r *http.Request, status int, data movieSearchPage) {
 	if data.Year >= 1 && data.Year <= 9999 {
 		if err := h.loadCurrent(r.Context(), &data); err != nil {
-			h.fail(w, r, err)
+			eventFailed(r, "load lineup", err)
+			http.Error(w, "Unable to load movie management. Please try again later.", http.StatusInternalServerError)
 			return
 		}
 	}
 	h.admin.render(w, r, "admin_movie_search.html", status, data)
-}
-
-func (h *movieSearchHandler) fail(w http.ResponseWriter, r *http.Request, err error) {
-	setRequestEvent(r, slog.LevelError, "movie management failed", "error", err)
-	http.Error(w, "Unable to load movie management. Please try again later.", http.StatusInternalServerError)
 }
 
 type movieChoice struct {

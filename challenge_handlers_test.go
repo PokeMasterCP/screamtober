@@ -202,7 +202,7 @@ func TestChallengeDatabaseFailureLogging(t *testing.T) {
 			if err := json.Unmarshal(bytes.TrimSpace(logs.Bytes()), &event); err != nil {
 				t.Fatalf("expected one combined log event: %v", err)
 			}
-			if event["message"] != "load challenge failed" || event["level"] != "error" || event["error"] == nil || event["request_id"] == nil {
+			if event["outcome"] != "failed" || event["step"] == nil || event["level"] != "error" || event["error"] == nil || event["request_id"] == nil {
 				t.Fatalf("missing failure details: %v", event)
 			}
 		})

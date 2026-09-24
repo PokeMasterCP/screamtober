@@ -77,6 +77,7 @@ func (a *auth) currentUser(r *http.Request) (*store.User, error) {
 	}
 	key, ok := cookieKey(r, sessionCookie)
 	if !ok {
+		addEventAttrs(r, "auth", "visitor")
 		return nil, nil
 	}
 	now := time.Now()
@@ -84,6 +85,7 @@ func (a *auth) currentUser(r *http.Request) (*store.User, error) {
 	// and disabling effective even for sessions issued before the change.
 	session, err := a.queries.GetUserSession(r.Context(), store.GetUserSessionParams{SessionHash: key[:], Now: now.Unix()})
 	if errors.Is(err, sql.ErrNoRows) {
+		addEventAttrs(r, "auth", "visitor")
 		return nil, nil
 	}
 	if err != nil {
@@ -96,6 +98,7 @@ func (a *auth) currentUser(r *http.Request) (*store.User, error) {
 			return nil, err
 		}
 	}
+	addEventAttrs(r, "auth", "personal", "user_id", session.User.ID)
 	return &session.User, nil
 }
 
@@ -111,6 +114,9 @@ func (a *auth) adminSignedIn(r *http.Request) bool {
 		delete(a.adminSessions, key)
 		return false
 	}
+	if ok {
+		addEventAttrs(r, "auth", "admin")
+	}
 	return ok
 }
 
@@ -121,6 +127,7 @@ type authenticatedUserKey struct{}
 func (a *auth) restrictAdminSession(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if a.adminSignedIn(r) && !strings.HasPrefix(r.URL.Path, "/admin/") {
+			eventRejected(r, "admin_session_active")
 			w.Header().Set("Cache-Control", "no-store")
 			if r.Method == http.MethodGet || r.Method == http.MethodHead {
 				http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
@@ -137,6 +144,7 @@ func (a *auth) requireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
 		if a.adminSignedIn(r) {
+			eventRejected(r, "admin_session_active")
 			http.Error(w, "Sign out of admin before using the product.", http.StatusForbidden)
 			return
 		}
@@ -146,6 +154,7 @@ func (a *auth) requireAuth(next http.Handler) http.Handler {
 			return
 		}
 		if user == nil {
+			eventRejected(r, "sign_in_required")
 			http.Error(w, "Sign in required", http.StatusUnauthorized)
 			return
 		}
@@ -157,6 +166,7 @@ func (a *auth) requireAdmin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
 		if !a.adminSignedIn(r) {
+			eventRejected(r, "admin_required")
 			if r.Method == http.MethodGet || r.Method == http.MethodHead {
 				http.Redirect(w, r, "/login", http.StatusSeeOther)
 			} else {
@@ -168,11 +178,11 @@ func (a *auth) requireAdmin(next http.Handler) http.Handler {
 	})
 }
 
-func loginToken(w http.ResponseWriter, r *http.Request, event string) (string, bool) {
+func loginToken(w http.ResponseWriter, r *http.Request) (string, bool) {
 	w.Header().Set("Cache-Control", "no-store")
 	r.Body = http.MaxBytesReader(w, r.Body, 4096)
 	if err := r.ParseForm(); err != nil {
-		setRequestEvent(r, slog.LevelWarn, event, "reason", "invalid_form")
+		eventRejected(r, "invalid_form")
 		http.Error(w, "Invalid login form", http.StatusBadRequest)
 		return "", false
 	}
@@ -180,12 +190,14 @@ func loginToken(w http.ResponseWriter, r *http.Request, event string) (string, b
 }
 
 func (a *auth) login(w http.ResponseWriter, r *http.Request) {
+	startEvent(r, "login")
 	if a.adminSignedIn(r) {
+		eventRejected(r, "admin_session_active")
 		w.Header().Set("Cache-Control", "no-store")
 		http.Error(w, "Sign out of admin before signing in again.", http.StatusForbidden)
 		return
 	}
-	token, ok := loginToken(w, r, "login failed")
+	token, ok := loginToken(w, r)
 	if !ok {
 		return
 	}
@@ -196,7 +208,8 @@ func (a *auth) login(w http.ResponseWriter, r *http.Request) {
 	}
 	user, err := a.queries.GetActiveUserByTokenHash(r.Context(), hash[:])
 	if errors.Is(err, sql.ErrNoRows) {
-		setRequestEvent(r, slog.LevelWarn, "login failed", "reason", "invalid_token")
+		// The redirect alone would log at info; failed sign-ins deserve attention.
+		recordEvent(r, slog.LevelWarn, "rejected", "reason", "invalid_token")
 		http.Redirect(w, r, "/login?error=invalid", http.StatusSeeOther)
 		return
 	}
@@ -237,7 +250,7 @@ func (a *auth) login(w http.ResponseWriter, r *http.Request) {
 	a.mu.Unlock()
 	a.clearCookie(w, adminSessionCookie)
 	a.setCookie(w, sessionCookie, "/", value, sessionMaxLifetime, expiry)
-	setRequestEvent(r, slog.LevelInfo, "login successful", "user_id", user.ID)
+	eventSucceeded(r, "session", "personal", "user_id", user.ID)
 	a.loginSuccess(w, r, false)
 }
 
@@ -262,14 +275,15 @@ func (a *auth) startAdminSession(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(a.adminSessions) >= maxAdminSessions {
 		a.mu.Unlock()
-		sessionLimit(w, r, "admin login failed")
+		eventRejected(r, "session_limit")
+		http.Error(w, "Too many active sessions; try again later", http.StatusServiceUnavailable)
 		return
 	}
 	a.adminSessions[sha256.Sum256([]byte(value))] = expiry
 	a.mu.Unlock()
 	a.clearCookie(w, sessionCookie)
 	a.setCookie(w, adminSessionCookie, "/", value, adminSessionLifetime, expiry)
-	setRequestEvent(r, slog.LevelInfo, "admin login successful")
+	eventSucceeded(r, "session", "admin")
 	a.loginSuccess(w, r, true)
 }
 
@@ -277,13 +291,8 @@ func (a *auth) setCookie(w http.ResponseWriter, name, path, value string, lifeti
 	http.SetCookie(w, &http.Cookie{Name: name, Value: value, Path: path, HttpOnly: true, Secure: !a.insecureCookie, SameSite: http.SameSiteLaxMode, MaxAge: int(lifetime.Seconds()), Expires: expiry})
 }
 
-func sessionLimit(w http.ResponseWriter, r *http.Request, event string) {
-	setRequestEvent(r, slog.LevelWarn, event, "reason", "session_limit")
-	http.Error(w, "Too many active sessions; try again later", http.StatusServiceUnavailable)
-}
-
-func authFailure(w http.ResponseWriter, r *http.Request, operation string, err error) {
-	setRequestEvent(r, slog.LevelError, "authentication failed", "operation", operation, "error", err)
+func authFailure(w http.ResponseWriter, r *http.Request, step string, err error) {
+	eventFailed(r, step, err)
 	http.Error(w, "Unable to sign in. Please try again later.", http.StatusInternalServerError)
 }
 
@@ -294,7 +303,7 @@ func (a *auth) endUserSession(w http.ResponseWriter, r *http.Request) bool {
 		return true
 	}
 	if err := a.queries.DeleteUserSession(r.Context(), key[:]); err != nil {
-		setRequestEvent(r, slog.LevelError, "sign-out failed", "operation", "end user session", "error", err)
+		eventFailed(r, "end user session", err)
 		http.Error(w, "Unable to sign out. Please try again later.", http.StatusInternalServerError)
 		return false
 	}
@@ -302,15 +311,18 @@ func (a *auth) endUserSession(w http.ResponseWriter, r *http.Request) bool {
 }
 
 func (a *auth) logout(w http.ResponseWriter, r *http.Request) {
+	startEvent(r, "logout")
 	w.Header().Set("Cache-Control", "no-store")
 	if !a.endUserSession(w, r) {
 		return
 	}
+	eventSucceeded(r)
 	a.clearCookie(w, sessionCookie)
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func (a *auth) adminLogout(w http.ResponseWriter, r *http.Request) {
+	startEvent(r, "admin.logout")
 	w.Header().Set("Cache-Control", "no-store")
 	if key, ok := cookieKey(r, adminSessionCookie); ok {
 		a.mu.Lock()
@@ -320,6 +332,7 @@ func (a *auth) adminLogout(w http.ResponseWriter, r *http.Request) {
 	if !a.endUserSession(w, r) {
 		return
 	}
+	eventSucceeded(r)
 	a.clearCookie(w, adminSessionCookie)
 	a.clearCookie(w, sessionCookie)
 	http.Redirect(w, r, "/login", http.StatusSeeOther)

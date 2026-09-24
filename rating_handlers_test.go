@@ -156,7 +156,7 @@ func TestRatingDatabaseFailure(t *testing.T) {
 		t.Fatalf("failure = %d %s", w.Code, w.Body.String())
 	}
 	var event map[string]any
-	if err := json.Unmarshal(bytes.TrimSpace(logs.Bytes()), &event); err != nil || event["message"] != "save rating" || event["error"] == nil {
+	if err := json.Unmarshal(bytes.TrimSpace(logs.Bytes()), &event); err != nil || event["event"] != "rating.save" || event["outcome"] != "failed" || event["error"] == nil {
 		t.Fatalf("missing single failure event: %s", logs.String())
 	}
 }

@@ -14,6 +14,7 @@ func pathYear(w http.ResponseWriter, r *http.Request) (int64, bool) {
 	raw := r.PathValue("year")
 	year, ok := parseYear(raw)
 	if !ok || strconv.FormatInt(year, 10) != raw {
+		eventRejected(r, "invalid_path")
 		http.NotFound(w, r)
 		return 0, false
 	}
@@ -24,6 +25,7 @@ func pathID(w http.ResponseWriter, r *http.Request) (int64, bool) {
 	raw := r.PathValue("id")
 	id, err := strconv.ParseInt(raw, 10, 64)
 	if err != nil || id <= 0 || strconv.FormatInt(id, 10) != raw {
+		eventRejected(r, "invalid_path")
 		http.NotFound(w, r)
 		return 0, false
 	}
@@ -36,5 +38,8 @@ func challengeMovieIDs(w http.ResponseWriter, r *http.Request) (int64, int64, bo
 		return 0, 0, false
 	}
 	id, ok := pathID(w, r)
+	if ok {
+		addEventAttrs(r, "year", year, "entry_id", id)
+	}
 	return year, id, ok
 }

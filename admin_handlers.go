@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"html/template"
-	"log/slog"
 	"net/http"
 	"strings"
 	"unicode/utf8"
@@ -67,6 +66,7 @@ func (h *adminHandler) render(w http.ResponseWriter, r *http.Request, name strin
 func (h *adminHandler) parseForm(w http.ResponseWriter, r *http.Request) bool {
 	r.Body = http.MaxBytesReader(w, r.Body, 4096)
 	if err := r.ParseForm(); err != nil {
+		eventRejected(r, "invalid_form")
 		h.showUsers(w, r, http.StatusBadRequest, adminUsersPage{Error: "The form could not be read. Please try again."})
 		return false
 	}
@@ -77,12 +77,23 @@ func validDisplayName(name string) bool {
 	return name != "" && utf8.ValidString(name) && utf8.RuneCountInString(name) <= 80
 }
 
+// pathUserID reads the managed profile from the path and records it on the event.
+func pathUserID(w http.ResponseWriter, r *http.Request) (int64, bool) {
+	id, ok := pathID(w, r)
+	if ok {
+		addEventAttrs(r, "user_id", id)
+	}
+	return id, ok
+}
+
 func (h *adminHandler) createUser(w http.ResponseWriter, r *http.Request) {
+	startEvent(r, "user.create")
 	if !h.parseForm(w, r) {
 		return
 	}
 	name, role := strings.TrimSpace(r.PostForm.Get("display_name")), r.PostForm.Get("role")
 	if !validDisplayName(name) || (role != "owner" && role != "member") {
+		eventRejected(r, "invalid_input")
 		h.showUsers(w, r, http.StatusBadRequest, adminUsersPage{Error: "Enter a name of 1–80 characters and choose a household role.", Name: name, Role: role})
 		return
 	}
@@ -100,23 +111,26 @@ func (h *adminHandler) createUser(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		var sqliteErr *sqlite.Error
 		if errors.As(err, &sqliteErr) && sqliteErr.Code()&0xff == sqlite3.SQLITE_CONSTRAINT {
+			eventRejected(r, "household_full", "role", role)
 			h.showUsers(w, r, http.StatusConflict, adminUsersPage{Error: "The household can have one owner and three members, including disabled profiles.", Name: name, Role: role})
 		} else {
 			h.fail(w, r, "create user", err)
 		}
 		return
 	}
-	setRequestEvent(r, slog.LevelInfo, "user created", "user_id", user.ID)
+	eventSucceeded(r, "user_id", user.ID, "role", role)
 	h.render(w, r, "admin_token.html", http.StatusCreated, issuedTokenPage{Name: user.DisplayName, Token: token})
 }
 
 func (h *adminHandler) renameUser(w http.ResponseWriter, r *http.Request) {
-	id, ok := pathID(w, r)
+	startEvent(r, "user.rename")
+	id, ok := pathUserID(w, r)
 	if !ok || !h.parseForm(w, r) {
 		return
 	}
 	name := strings.TrimSpace(r.PostForm.Get("display_name"))
 	if !validDisplayName(name) {
+		eventRejected(r, "invalid_input")
 		h.showUsers(w, r, http.StatusBadRequest, adminUsersPage{Error: "Enter a name of 1–80 characters."})
 		return
 	}
@@ -125,12 +139,13 @@ func (h *adminHandler) renameUser(w http.ResponseWriter, r *http.Request) {
 		h.writeFailure(w, r, "rename user", err)
 		return
 	}
-	setRequestEvent(r, slog.LevelInfo, "user renamed", "user_id", id)
+	eventSucceeded(r)
 	http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 }
 
 func (h *adminHandler) replaceToken(w http.ResponseWriter, r *http.Request) {
-	id, ok := pathID(w, r)
+	startEvent(r, "user.replace_token")
+	id, ok := pathUserID(w, r)
 	if !ok {
 		return
 	}
@@ -152,12 +167,13 @@ func (h *adminHandler) replaceToken(w http.ResponseWriter, r *http.Request) {
 		h.writeFailure(w, r, "replace user token", err)
 		return
 	}
-	setRequestEvent(r, slog.LevelInfo, "user token replaced", "user_id", id)
+	eventSucceeded(r)
 	h.render(w, r, "admin_token.html", http.StatusOK, issuedTokenPage{Name: user.DisplayName, Token: token})
 }
 
 func (h *adminHandler) disableUser(w http.ResponseWriter, r *http.Request) {
-	id, ok := pathID(w, r)
+	startEvent(r, "user.disable")
+	id, ok := pathUserID(w, r)
 	if !ok {
 		return
 	}
@@ -174,19 +190,20 @@ func (h *adminHandler) disableUser(w http.ResponseWriter, r *http.Request) {
 		h.writeFailure(w, r, "disable user", err)
 		return
 	}
-	setRequestEvent(r, slog.LevelInfo, "user disabled", "user_id", id)
+	eventSucceeded(r)
 	http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 }
 
-func (h *adminHandler) writeFailure(w http.ResponseWriter, r *http.Request, operation string, err error) {
+func (h *adminHandler) writeFailure(w http.ResponseWriter, r *http.Request, step string, err error) {
 	if errors.Is(err, sql.ErrNoRows) {
+		eventRejected(r, "not_found")
 		http.NotFound(w, r)
 		return
 	}
-	h.fail(w, r, operation, err)
+	h.fail(w, r, step, err)
 }
 
-func (h *adminHandler) fail(w http.ResponseWriter, r *http.Request, operation string, err error) {
-	setRequestEvent(r, slog.LevelError, "user management failed", "operation", operation, "error", err)
+func (h *adminHandler) fail(w http.ResponseWriter, r *http.Request, step string, err error) {
+	eventFailed(r, step, err)
 	http.Error(w, "Unable to manage users. Please try again later.", http.StatusInternalServerError)
 }
