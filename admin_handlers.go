@@ -18,7 +18,6 @@ import (
 type adminHandler struct {
 	db      *sql.DB
 	queries *store.Queries
-	auth    *auth
 	pages   *template.Template
 }
 
@@ -144,13 +143,15 @@ func (h *adminHandler) replaceToken(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return err
 		}
-		return q.SetUserToken(r.Context(), store.SetUserTokenParams{UserID: id, TokenHash: hash[:]})
+		if err := q.SetUserToken(r.Context(), store.SetUserTokenParams{UserID: id, TokenHash: hash[:]}); err != nil {
+			return err
+		}
+		return q.DeleteUserSessions(r.Context(), id)
 	})
 	if err != nil {
 		h.writeFailure(w, r, "replace user token", err)
 		return
 	}
-	h.auth.revokeUserSessions(id)
 	setRequestEvent(r, slog.LevelInfo, "user token replaced", "user_id", id)
 	h.render(w, r, "admin_token.html", http.StatusOK, issuedTokenPage{Name: user.DisplayName, Token: token})
 }
@@ -164,13 +165,15 @@ func (h *adminHandler) disableUser(w http.ResponseWriter, r *http.Request) {
 		if _, err := q.DisableUser(r.Context(), id); err != nil {
 			return err
 		}
-		return q.DeleteUserToken(r.Context(), id)
+		if err := q.DeleteUserToken(r.Context(), id); err != nil {
+			return err
+		}
+		return q.DeleteUserSessions(r.Context(), id)
 	})
 	if err != nil {
 		h.writeFailure(w, r, "disable user", err)
 		return
 	}
-	h.auth.revokeUserSessions(id)
 	setRequestEvent(r, slog.LevelInfo, "user disabled", "user_id", id)
 	http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 }

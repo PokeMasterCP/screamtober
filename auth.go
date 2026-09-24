@@ -21,23 +21,26 @@ import (
 
 const sessionCookie = "screamtober_session"
 const adminSessionCookie = "screamtober_admin_session"
-const sessionLifetime = 12 * time.Hour
-const adminSessionLifetime = time.Hour
-const maxSessions = 128
 
-type userSession struct {
-	userID    int64
-	tokenHash [32]byte
-	expiresAt time.Time
-}
+// Personal sessions are stored in the database so they survive restarts. They
+// stay active while used, up to a fixed maximum, and renew at most daily to
+// avoid a database write on every request.
+const sessionIdleTimeout = 30 * 24 * time.Hour
+const sessionMaxLifetime = 90 * 24 * time.Hour
+const sessionRenewInterval = 24 * time.Hour
+const sessionsPerUser = 10
+
+// Admin sessions are short and kept in memory, so a restart signs admin out.
+const adminSessionLifetime = time.Hour
+const maxAdminSessions = 128
 
 type auth struct {
 	adminTokenHash [32]byte
 	insecureCookie bool
+	db             *sql.DB
 	queries        *store.Queries
 	pages          *template.Template
 	mu             sync.Mutex
-	sessions       map[[32]byte]userSession
 	adminSessions  map[[32]byte]time.Time
 }
 
@@ -50,8 +53,7 @@ func newAuth(token string, insecureCookie bool, db *sql.DB) (*auth, error) {
 	}
 	return &auth{
 		adminTokenHash: sha256.Sum256([]byte(token)), insecureCookie: insecureCookie,
-		queries: store.New(db), sessions: make(map[[32]byte]userSession),
-		adminSessions: make(map[[32]byte]time.Time),
+		db: db, queries: store.New(db), adminSessions: make(map[[32]byte]time.Time),
 	}, nil
 }
 
@@ -77,29 +79,24 @@ func (a *auth) currentUser(r *http.Request) (*store.User, error) {
 	if !ok {
 		return nil, nil
 	}
-	a.mu.Lock()
-	session, ok := a.sessions[key]
-	if ok && !time.Now().Before(session.expiresAt) {
-		delete(a.sessions, key)
-		ok = false
-	}
-	a.mu.Unlock()
-	if !ok {
-		return nil, nil
-	}
-	// Checking the credential on every authenticated request makes replacement
+	now := time.Now()
+	// Checking the issuing token on every authenticated request makes replacement
 	// and disabling effective even for sessions issued before the change.
-	user, err := a.queries.GetActiveUserByTokenHash(r.Context(), session.tokenHash[:])
+	session, err := a.queries.GetUserSession(r.Context(), store.GetUserSessionParams{SessionHash: key[:], Now: now.Unix()})
 	if errors.Is(err, sql.ErrNoRows) {
-		a.mu.Lock()
-		delete(a.sessions, key)
-		a.mu.Unlock()
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	return &user, nil
+	expiry := min(now.Add(sessionIdleTimeout).Unix(), session.MaxExpiresAt)
+	gain := expiry - session.ExpiresAt
+	if gain >= int64(sessionRenewInterval.Seconds()) || (gain > 0 && expiry == session.MaxExpiresAt) {
+		if err := a.queries.RenewUserSession(r.Context(), store.RenewUserSessionParams{ExpiresAt: expiry, SessionHash: key[:]}); err != nil {
+			return nil, err
+		}
+	}
+	return &session.User, nil
 }
 
 func (a *auth) adminSignedIn(r *http.Request) bool {
@@ -208,34 +205,49 @@ func (a *auth) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	value := newLoginToken()
+	key := sha256.Sum256([]byte(value))
 	now := time.Now()
-	expiry := now.Add(sessionLifetime)
-	a.mu.Lock()
-	for key, session := range a.sessions {
-		if !now.Before(session.expiresAt) {
-			delete(a.sessions, key)
+	// The cookie lasts for the maximum lifetime; the server enforces idle expiry.
+	expiry := now.Add(sessionMaxLifetime)
+	err = withTransaction(r.Context(), a.db, func(q *store.Queries) error {
+		if err := q.DeleteExpiredUserSessions(r.Context(), now.Unix()); err != nil {
+			return err
 		}
-	}
-	if old, ok := cookieKey(r, sessionCookie); ok {
-		delete(a.sessions, old)
-	}
-	if len(a.sessions) >= maxSessions {
-		a.mu.Unlock()
-		sessionLimit(w, r, "login failed")
+		if old, ok := cookieKey(r, sessionCookie); ok {
+			if err := q.DeleteUserSession(r.Context(), old[:]); err != nil {
+				return err
+			}
+		}
+		if err := q.CreateUserSession(r.Context(), store.CreateUserSessionParams{
+			SessionHash: key[:], UserID: user.ID, TokenHash: hash[:],
+			ExpiresAt: now.Add(sessionIdleTimeout).Unix(), MaxExpiresAt: expiry.Unix(),
+		}); err != nil {
+			return err
+		}
+		return q.TrimUserSessions(r.Context(), store.TrimUserSessionsParams{UserID: user.ID, Keep: sessionsPerUser})
+	})
+	if err != nil {
+		authFailure(w, r, "create user session", err)
 		return
 	}
-	a.sessions[sha256.Sum256([]byte(value))] = userSession{userID: user.ID, tokenHash: hash, expiresAt: expiry}
+	a.mu.Lock()
 	if old, ok := cookieKey(r, adminSessionCookie); ok {
 		delete(a.adminSessions, old)
 	}
 	a.mu.Unlock()
 	a.clearCookie(w, adminSessionCookie)
-	a.setCookie(w, sessionCookie, "/", value, sessionLifetime, expiry)
+	a.setCookie(w, sessionCookie, "/", value, sessionMaxLifetime, expiry)
 	setRequestEvent(r, slog.LevelInfo, "login successful", "user_id", user.ID)
 	a.loginSuccess(w, r, false)
 }
 
 func (a *auth) startAdminSession(w http.ResponseWriter, r *http.Request) {
+	if old, ok := cookieKey(r, sessionCookie); ok {
+		if err := a.queries.DeleteUserSession(r.Context(), old[:]); err != nil {
+			authFailure(w, r, "end user session", err)
+			return
+		}
+	}
 	value := newLoginToken()
 	now := time.Now()
 	expiry := now.Add(adminSessionLifetime)
@@ -248,15 +260,12 @@ func (a *auth) startAdminSession(w http.ResponseWriter, r *http.Request) {
 	if old, ok := cookieKey(r, adminSessionCookie); ok {
 		delete(a.adminSessions, old)
 	}
-	if len(a.adminSessions) >= maxSessions {
+	if len(a.adminSessions) >= maxAdminSessions {
 		a.mu.Unlock()
 		sessionLimit(w, r, "admin login failed")
 		return
 	}
 	a.adminSessions[sha256.Sum256([]byte(value))] = expiry
-	if old, ok := cookieKey(r, sessionCookie); ok {
-		delete(a.sessions, old)
-	}
 	a.mu.Unlock()
 	a.clearCookie(w, sessionCookie)
 	a.setCookie(w, adminSessionCookie, "/", value, adminSessionLifetime, expiry)
@@ -278,22 +287,24 @@ func authFailure(w http.ResponseWriter, r *http.Request, operation string, err e
 	http.Error(w, "Unable to sign in. Please try again later.", http.StatusInternalServerError)
 }
 
-func (a *auth) revokeUserSessions(userID int64) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	for key, session := range a.sessions {
-		if session.userID == userID {
-			delete(a.sessions, key)
-		}
+// endUserSession revokes the browser's personal session, reporting any failure.
+func (a *auth) endUserSession(w http.ResponseWriter, r *http.Request) bool {
+	key, ok := cookieKey(r, sessionCookie)
+	if !ok {
+		return true
 	}
+	if err := a.queries.DeleteUserSession(r.Context(), key[:]); err != nil {
+		setRequestEvent(r, slog.LevelError, "sign-out failed", "operation", "end user session", "error", err)
+		http.Error(w, "Unable to sign out. Please try again later.", http.StatusInternalServerError)
+		return false
+	}
+	return true
 }
 
 func (a *auth) logout(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
-	if key, ok := cookieKey(r, sessionCookie); ok {
-		a.mu.Lock()
-		delete(a.sessions, key)
-		a.mu.Unlock()
+	if !a.endUserSession(w, r) {
+		return
 	}
 	a.clearCookie(w, sessionCookie)
 	http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -306,10 +317,8 @@ func (a *auth) adminLogout(w http.ResponseWriter, r *http.Request) {
 		delete(a.adminSessions, key)
 		a.mu.Unlock()
 	}
-	if key, ok := cookieKey(r, sessionCookie); ok {
-		a.mu.Lock()
-		delete(a.sessions, key)
-		a.mu.Unlock()
+	if !a.endUserSession(w, r) {
+		return
 	}
 	a.clearCookie(w, adminSessionCookie)
 	a.clearCookie(w, sessionCookie)

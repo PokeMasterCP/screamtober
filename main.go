@@ -30,7 +30,7 @@ func newHandlerWithMovieSearch(auth *auth, db *sql.DB, movies movieSearcher) (ht
 
 	auth.pages = pages
 	mux := http.NewServeMux()
-	admin := &adminHandler{db: db, queries: store.New(db), auth: auth, pages: pages}
+	admin := &adminHandler{db: db, queries: store.New(db), pages: pages}
 	mux.Handle("GET /admin/calendar", auth.requireAdmin(http.HandlerFunc(admin.calendar)))
 	mux.Handle("POST /admin/calendar", auth.requireAdmin(http.HandlerFunc(admin.saveCalendar)))
 	search := &movieSearchHandler{admin: admin, movies: movies}

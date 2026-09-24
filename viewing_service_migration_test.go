@@ -107,7 +107,7 @@ func TestViewingServiceUpgradePreservesExistingData(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := provider.Down(ctx); err != nil {
+	if _, err := provider.DownTo(ctx, 1); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(before, snapshot()) {
