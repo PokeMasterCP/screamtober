@@ -91,6 +91,11 @@ startup and lifecycle events get their own records.
 - The session check records `auth` (`visitor`, `personal`, or `admin`).
   `user_id` is the profile the request acted as or on. Use `year`, `entry_id`
   (challenge entry), and `tmdb_id` for identifiers.
+- Record side effects beyond the operation's target, such as
+  `sessions_revoked`, `session_renewed`, `first_watch`, or `catalogued`.
+- Create queries with `newQueries` and transactions with `withTransaction` so the
+  record carries `db_queries` and `db_ms`. The time includes waiting for the
+  single connection and running each statement to its first row.
 - The level follows the status (errors for 5xx and aborted requests, warnings
   for 4xx) and only rises when a handler asks, as failed sign-ins do.
 

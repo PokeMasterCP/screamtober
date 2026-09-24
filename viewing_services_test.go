@@ -27,8 +27,8 @@ func TestViewingServiceEntries(t *testing.T) {
 		}
 	}
 	// A POST retry must not overwrite the service chosen by the original submission.
-	if duplicate, err := addYearlyMovie(ctx, db, movie, 2028, "a", "shudder"); err != nil || !duplicate {
-		t.Fatal(duplicate, err)
+	if added, err := addYearlyMovie(ctx, db, movie, 2028, "a", "shudder"); err != nil || !added.duplicate {
+		t.Fatal(added, err)
 	}
 	q := store.New(db)
 	for year, want := range map[int64][]string{2028: {"netflix", "plex"}, 2029: {"theaters"}} {

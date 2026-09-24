@@ -51,7 +51,7 @@ func (h *movieSearchHandler) add(w http.ResponseWriter, r *http.Request) {
 		if movie.ID != id {
 			continue
 		}
-		duplicate, err := addYearlyMovie(r.Context(), h.admin.db, movie, int(year), r.PostForm.Get("search_reference"), service)
+		added, err := addYearlyMovie(r.Context(), h.admin.db, movie, int(year), r.PostForm.Get("search_reference"), service)
 		if errors.Is(err, errYearFull) {
 			reject(409, "That year already has 31 movies. Choose another year or remove a pick before adding more.", "year_full")
 			return
@@ -63,10 +63,10 @@ func (h *movieSearchHandler) add(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		data.Notice = fmt.Sprintf("%s added to %d as an unscheduled pick and saved in your catalog.", movie.Title, year)
-		if duplicate {
+		if added.duplicate {
 			data.Notice = fmt.Sprintf("This selection of %s is already in %d.", movie.Title, year)
 		}
-		eventSucceeded(r, "duplicate", duplicate)
+		eventSucceeded(r, "entry_id", added.entryID, "duplicate", added.duplicate, "catalogued", added.catalogued)
 		h.render(w, r, http.StatusOK, data)
 		return
 	}

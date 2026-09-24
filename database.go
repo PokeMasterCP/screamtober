@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/pokemastercp/screamtober/internal/store"
 	"github.com/pressly/goose/v3"
@@ -63,14 +64,41 @@ func openDatabase(ctx context.Context, path string) (*sql.DB, error) {
 	return db, nil
 }
 
+// loggedDB adds each statement's time, including waiting for the single
+// connection, to the request's completion log. The driver runs a query to its
+// first row before returning, so later rows are read untimed.
+type loggedDB struct{ store.DBTX }
+
+func newQueries(db store.DBTX) *store.Queries {
+	return store.New(loggedDB{db})
+}
+
+func (l loggedDB) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+	defer recordDatabase(ctx, time.Now(), 1)
+	return l.DBTX.ExecContext(ctx, query, args...)
+}
+
+func (l loggedDB) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
+	defer recordDatabase(ctx, time.Now(), 1)
+	return l.DBTX.QueryContext(ctx, query, args...)
+}
+
+func (l loggedDB) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
+	defer recordDatabase(ctx, time.Now(), 1)
+	return l.DBTX.QueryRowContext(ctx, query, args...)
+}
+
 func withTransaction(ctx context.Context, db *sql.DB, fn func(*store.Queries) error) error {
+	started := time.Now()
 	tx, err := db.BeginTx(ctx, nil)
+	recordDatabase(ctx, started, 0)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	if err := fn(store.New(tx)); err != nil {
+	if err := fn(newQueries(tx)); err != nil {
 		return err
 	}
+	defer recordDatabase(ctx, time.Now(), 0)
 	return tx.Commit()
 }

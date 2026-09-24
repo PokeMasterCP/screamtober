@@ -152,8 +152,15 @@ func (h *adminHandler) replaceToken(w http.ResponseWriter, r *http.Request) {
 	token := newLoginToken()
 	hash := sha256.Sum256([]byte(token))
 	var user store.User
+	var reenabled bool
+	var revoked int64
 	err := withTransaction(r.Context(), h.db, func(q *store.Queries) error {
-		var err error
+		// Replacing a disabled profile's token also restores its access.
+		previous, err := q.GetUser(r.Context(), id)
+		if err != nil {
+			return err
+		}
+		reenabled = previous.DisabledAt.Valid
 		user, err = q.EnableUser(r.Context(), id)
 		if err != nil {
 			return err
@@ -161,13 +168,14 @@ func (h *adminHandler) replaceToken(w http.ResponseWriter, r *http.Request) {
 		if err := q.SetUserToken(r.Context(), store.SetUserTokenParams{UserID: id, TokenHash: hash[:]}); err != nil {
 			return err
 		}
-		return q.DeleteUserSessions(r.Context(), id)
+		revoked, err = q.DeleteUserSessions(r.Context(), id)
+		return err
 	})
 	if err != nil {
 		h.writeFailure(w, r, "replace user token", err)
 		return
 	}
-	eventSucceeded(r)
+	eventSucceeded(r, "reenabled", reenabled, "sessions_revoked", revoked)
 	h.render(w, r, "admin_token.html", http.StatusOK, issuedTokenPage{Name: user.DisplayName, Token: token})
 }
 
@@ -177,6 +185,7 @@ func (h *adminHandler) disableUser(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	var revoked int64
 	err := withTransaction(r.Context(), h.db, func(q *store.Queries) error {
 		if _, err := q.DisableUser(r.Context(), id); err != nil {
 			return err
@@ -184,13 +193,15 @@ func (h *adminHandler) disableUser(w http.ResponseWriter, r *http.Request) {
 		if err := q.DeleteUserToken(r.Context(), id); err != nil {
 			return err
 		}
-		return q.DeleteUserSessions(r.Context(), id)
+		var err error
+		revoked, err = q.DeleteUserSessions(r.Context(), id)
+		return err
 	})
 	if err != nil {
 		h.writeFailure(w, r, "disable user", err)
 		return
 	}
-	eventSucceeded(r)
+	eventSucceeded(r, "sessions_revoked", revoked)
 	http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 }
 

@@ -327,6 +327,25 @@ func TestPortalValidationAndLogging(t *testing.T) {
 	}
 }
 
+func TestRevocationLogging(t *testing.T) {
+	_, h := portalFixture(t, nil)
+	admin := adminCookie(t, h)
+	token := issuedToken(t, portalRequest(h, "POST", "/admin/users", url.Values{"display_name": {"Person"}, "role": {"owner"}}, admin), 201)
+	personalCookie(t, h, token)
+	personalCookie(t, h, token)
+	for _, tt := range []struct {
+		path string
+		want map[string]any
+	}{
+		{"/admin/users/1/disable", map[string]any{"event": "user.disable", "sessions_revoked": float64(2)}},
+		{"/admin/users/1/token", map[string]any{"event": "user.replace_token", "reenabled": true, "sessions_revoked": float64(0)}},
+		{"/admin/users/1/token", map[string]any{"event": "user.replace_token", "reenabled": false}},
+	} {
+		_, event := loggedRequest(t, h, formRequest("POST", tt.path, "", admin))
+		assertEvent(t, event, tt.want)
+	}
+}
+
 func TestCredentialCheckedAfterExternalRevocation(t *testing.T) {
 	db := schemaFixture(t)
 	setTestUserToken(t, db, 2, testToken)

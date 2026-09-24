@@ -340,6 +340,26 @@ func TestAuthConfigurationAndInput(t *testing.T) {
 	}
 }
 
+func TestSessionActionLogging(t *testing.T) {
+	a, h := authFixture(t, testToken, false)
+	cookie := loginCookie(t, h)
+	setSessionExpiry(t, a, cookie, time.Hour, sessionMaxLifetime)
+	_, event := loggedRequest(t, h, formRequest("GET", "/", "", cookie))
+	assertEvent(t, event, map[string]any{"auth": "personal", "user_id": float64(1), "session_renewed": true})
+	_, event = loggedRequest(t, h, formRequest("GET", "/", "", cookie))
+	assertEvent(t, event, map[string]any{"session_renewed": nil})
+
+	_, event = loggedRequest(t, h, formRequest("POST", "/logout", "", cookie))
+	assertEvent(t, event, map[string]any{"event": "logout", "outcome": "success", "user_id": float64(1)})
+	// Signing out again finds no stored session and names no one.
+	_, event = loggedRequest(t, h, formRequest("POST", "/logout", "", cookie))
+	assertEvent(t, event, map[string]any{"event": "logout", "outcome": "success", "user_id": nil})
+
+	cookie = loginCookie(t, h)
+	_, event = loggedRequest(t, h, formRequest("POST", "/login", url.Values{"token": {testAdminToken}}.Encode(), cookie))
+	assertEvent(t, event, map[string]any{"event": "login", "session": "admin", "ended_personal_session": true})
+}
+
 func TestSuccessfulLoginConfirmation(t *testing.T) {
 	for _, tt := range []struct{ name, token, link string }{
 		{"personal", testToken, `href="/"`},

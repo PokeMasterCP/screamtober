@@ -11,7 +11,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/pokemastercp/screamtober/internal/store"
 	"github.com/pokemastercp/screamtober/internal/tmdb"
 )
 
@@ -30,7 +29,7 @@ func newHandlerWithMovieSearch(auth *auth, db *sql.DB, movies movieSearcher) (ht
 
 	auth.pages = pages
 	mux := http.NewServeMux()
-	admin := &adminHandler{db: db, queries: store.New(db), pages: pages}
+	admin := &adminHandler{db: db, queries: newQueries(db), pages: pages}
 	mux.Handle("GET /admin/calendar", auth.requireAdmin(http.HandlerFunc(admin.calendar)))
 	mux.Handle("POST /admin/calendar", auth.requireAdmin(http.HandlerFunc(admin.saveCalendar)))
 	search := &movieSearchHandler{admin: admin, movies: movies}
@@ -58,7 +57,7 @@ func newHandlerWithMovieSearch(auth *auth, db *sql.DB, movies movieSearcher) (ht
 	mux.HandleFunc("GET /credits", func(w http.ResponseWriter, r *http.Request) {
 		renderPage(w, r, pages, "credits.html", http.StatusOK, nil)
 	})
-	challenges := &challengeHandler{db: db, queries: store.New(db), auth: auth, pages: pages}
+	challenges := &challengeHandler{db: db, queries: newQueries(db), auth: auth, pages: pages}
 	mux.HandleFunc("GET /{$}", challenges.home)
 	mux.HandleFunc("GET /challenges/{year}", challenges.byYear)
 	mux.Handle("POST /challenges/{year}/movies/{id}/rating", auth.requireAuth(http.HandlerFunc(challenges.rate)))

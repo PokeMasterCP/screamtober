@@ -53,7 +53,7 @@ func newAuth(token string, insecureCookie bool, db *sql.DB) (*auth, error) {
 	}
 	return &auth{
 		adminTokenHash: sha256.Sum256([]byte(token)), insecureCookie: insecureCookie,
-		db: db, queries: store.New(db), adminSessions: make(map[[32]byte]time.Time),
+		db: db, queries: newQueries(db), adminSessions: make(map[[32]byte]time.Time),
 	}, nil
 }
 
@@ -97,6 +97,7 @@ func (a *auth) currentUser(r *http.Request) (*store.User, error) {
 		if err := a.queries.RenewUserSession(r.Context(), store.RenewUserSessionParams{ExpiresAt: expiry, SessionHash: key[:]}); err != nil {
 			return nil, err
 		}
+		addEventAttrs(r, "session_renewed", true)
 	}
 	addEventAttrs(r, "auth", "personal", "user_id", session.User.ID)
 	return &session.User, nil
@@ -227,7 +228,7 @@ func (a *auth) login(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 		if old, ok := cookieKey(r, sessionCookie); ok {
-			if err := q.DeleteUserSession(r.Context(), old[:]); err != nil {
+			if _, err := q.DeleteUserSession(r.Context(), old[:]); err != nil && !errors.Is(err, sql.ErrNoRows) {
 				return err
 			}
 		}
@@ -256,7 +257,10 @@ func (a *auth) login(w http.ResponseWriter, r *http.Request) {
 
 func (a *auth) startAdminSession(w http.ResponseWriter, r *http.Request) {
 	if old, ok := cookieKey(r, sessionCookie); ok {
-		if err := a.queries.DeleteUserSession(r.Context(), old[:]); err != nil {
+		_, err := a.queries.DeleteUserSession(r.Context(), old[:])
+		if err == nil {
+			addEventAttrs(r, "ended_personal_session", true)
+		} else if !errors.Is(err, sql.ErrNoRows) {
 			authFailure(w, r, "end user session", err)
 			return
 		}
@@ -302,7 +306,10 @@ func (a *auth) endUserSession(w http.ResponseWriter, r *http.Request) bool {
 	if !ok {
 		return true
 	}
-	if err := a.queries.DeleteUserSession(r.Context(), key[:]); err != nil {
+	userID, err := a.queries.DeleteUserSession(r.Context(), key[:])
+	if err == nil {
+		addEventAttrs(r, "user_id", userID)
+	} else if !errors.Is(err, sql.ErrNoRows) {
 		eventFailed(r, "end user session", err)
 		http.Error(w, "Unable to sign out. Please try again later.", http.StatusInternalServerError)
 		return false
