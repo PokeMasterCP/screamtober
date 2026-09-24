@@ -32,7 +32,7 @@ func (s *searchStub) SearchMovies(ctx context.Context, query string, options tmd
 }
 
 func TestMovieSearchPage(t *testing.T) {
-	db, err := openDatabase(context.Background(), filepath.Join(t.TempDir(), "search.db"))
+	db, _, err := openDatabase(context.Background(), filepath.Join(t.TempDir(), "search.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,7 +87,7 @@ func TestMovieSearchPage(t *testing.T) {
 }
 
 func TestMovieSearchPageSize(t *testing.T) {
-	db, err := openDatabase(context.Background(), filepath.Join(t.TempDir(), "search.db"))
+	db, _, err := openDatabase(context.Background(), filepath.Join(t.TempDir(), "search.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -154,7 +154,7 @@ func TestMovieSearchPageSize(t *testing.T) {
 }
 
 func TestMovieSearchRequiresAdmin(t *testing.T) {
-	db, err := openDatabase(context.Background(), filepath.Join(t.TempDir(), "search.db"))
+	db, _, err := openDatabase(context.Background(), filepath.Join(t.TempDir(), "search.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -188,7 +188,7 @@ func TestMovieSearchRequiresAdmin(t *testing.T) {
 }
 
 func TestMovieSearchCompletionLog(t *testing.T) {
-	db, err := openDatabase(context.Background(), filepath.Join(t.TempDir(), "search.db"))
+	db, _, err := openDatabase(context.Background(), filepath.Join(t.TempDir(), "search.db"))
 	if err != nil {
 		t.Fatal(err)
 	}

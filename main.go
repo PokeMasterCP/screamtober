@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/pokemastercp/screamtober/internal/tmdb"
@@ -95,14 +96,16 @@ func main() {
 		os.Exit(1)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	db, err := openDatabase(ctx, path)
+	started := time.Now()
+	db, schema, err := openDatabase(ctx, path)
 	cancel()
 	if err != nil {
 		logger.Error("initialize database", "error", err)
 		os.Exit(1)
 	}
 	defer db.Close()
-	logger.Info("database initialized", "path", path)
+	logger.Info("database initialized", "path", path, "schema_version", schema.version,
+		"migrations_applied", schema.applied, "duration_ms", float64(time.Since(started))/float64(time.Millisecond))
 	auth, err := newAuth(os.Getenv("ADMIN_TOKEN"), insecureCookie, db)
 	if err != nil {
 		logger.Error("invalid authentication configuration", "error", err)
@@ -128,7 +131,9 @@ func main() {
 		WriteTimeout:      10 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
-	logger.Info("starting server", "addr", addr)
+	// Report settings, never secrets. tmdb.New trims the key the same way.
+	logger.Info("starting server", "addr", addr, "cloudflare_tunnel", tunnel, "insecure_cookie", insecureCookie,
+		"tmdb_configured", strings.TrimSpace(os.Getenv("TMDB_API_KEY")) != "")
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		logger.Error("server stopped", "error", err)
 		db.Close()

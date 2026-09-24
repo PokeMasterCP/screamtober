@@ -31,37 +31,51 @@ func databasePath(directory string) (string, error) {
 	return path, nil
 }
 
-func openDatabase(ctx context.Context, path string) (*sql.DB, error) {
+// schemaStatus reports the schema version and the migrations applied at open.
+type schemaStatus struct {
+	version int64
+	applied []int64
+}
+
+func openDatabase(ctx context.Context, path string) (*sql.DB, schemaStatus, error) {
+	status := schemaStatus{applied: []int64{}}
 	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
-		return nil, fmt.Errorf("create database directory: %w", err)
+		return nil, status, fmt.Errorf("create database directory: %w", err)
 	}
 	// URI encoding keeps filenames containing '?' or '#' from becoming options.
 	params := url.Values{"_pragma": {"foreign_keys(1)", "busy_timeout(5000)", "journal_mode(WAL)"}}
 	dsn := (&url.URL{Scheme: "file", Path: path, RawQuery: params.Encode()}).String()
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
-		return nil, fmt.Errorf("open database: %w", err)
+		return nil, status, fmt.Errorf("open database: %w", err)
 	}
 	// Serialize this small application's writes; pragmas apply to replacement connections too.
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)
 	if err := db.PingContext(ctx); err != nil {
 		db.Close()
-		return nil, fmt.Errorf("connect database: %w", err)
+		return nil, status, fmt.Errorf("connect database: %w", err)
 	}
 	migrations, err := fs.Sub(migrationFiles, "migrations")
 	if err == nil {
 		var provider *goose.Provider
 		provider, err = goose.NewProvider(goose.DialectSQLite3, db, migrations, goose.WithDisableGlobalRegistry(true))
 		if err == nil {
-			_, err = provider.Up(ctx)
+			var results []*goose.MigrationResult
+			results, err = provider.Up(ctx)
+			for _, result := range results {
+				status.applied = append(status.applied, result.Source.Version)
+			}
+		}
+		if err == nil {
+			status.version, err = provider.GetDBVersion(ctx)
 		}
 	}
 	if err != nil {
 		db.Close()
-		return nil, fmt.Errorf("migrate database: %w", err)
+		return nil, status, fmt.Errorf("migrate database: %w", err)
 	}
-	return db, nil
+	return db, status, nil
 }
 
 // loggedDB adds each statement's time, including waiting for the single
