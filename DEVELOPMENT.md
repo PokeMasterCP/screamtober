@@ -48,6 +48,15 @@ commit together, preserving its first watched time without backfilling history a
 startup. Calendar reordering clears and assigns positions in one transaction,
 retaining entry IDs. Scope writes to the requested challenge and entry.
 
+## Sessions
+
+Personal sessions are stored in `user_sessions` as SHA-256 hashes of the cookie
+value. A lookup requires the issuing token to still be current and the profile to
+be enabled. Token replacement and disabling delete that person's sessions in the
+same transaction. Sessions slide with use (renewed at most daily) up to a fixed
+maximum lifetime. Each person keeps up to 10, and signing in again replaces the
+least recently used one. Admin sessions stay in memory.
+
 ## Pages
 
 Use `site_style.html`, the buffered `renderPage` helper, and `movie_ratings.html`

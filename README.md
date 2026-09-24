@@ -121,8 +121,11 @@ lost token; **Disable access** signs that person out while preserving their prof
 and ratings. Disabled profiles still count toward the household limit.
 
 Admin access manages the app; personal tokens—including the owner's—are for
-ratings. Sign out before switching between them. There is no public registration,
-and restarting the app signs everyone out without changing their login tokens.
+ratings. Sign out before switching between them. There is no public registration.
+
+Personal sign-ins stay active across restarts and upgrades. They end after 30 days
+without use, or 90 days after signing in. Admin sessions last one hour, and
+restarting the app signs admin out.
 
 ## Storage, backups, and upgrades
 

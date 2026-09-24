@@ -59,6 +59,9 @@ func TestSchemaConstraints(t *testing.T) {
 		{"delete referenced movie", `DELETE FROM movies WHERE id = 1`},
 		{"delete referenced year", `DELETE FROM challenges WHERE id = 1`},
 		{"delete rating author", `DELETE FROM users WHERE id = 2`},
+		{"raw session value", `INSERT INTO user_sessions (session_hash, user_id, token_hash, expires_at, max_expires_at) VALUES ('raw', 2, zeroblob(32), 1, 2)`},
+		{"session for unknown user", `INSERT INTO user_sessions (session_hash, user_id, token_hash, expires_at, max_expires_at) VALUES (zeroblob(32), 99, zeroblob(32), 1, 2)`},
+		{"session past maximum", `INSERT INTO user_sessions (session_hash, user_id, token_hash, expires_at, max_expires_at) VALUES (zeroblob(32), 2, zeroblob(32), 3, 2)`},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			if _, err := db.ExecContext(context.Background(), tt.query); err == nil {
@@ -132,7 +135,7 @@ func TestSchemaRollbackAndRebuild(t *testing.T) {
 		t.Fatal(err)
 	}
 	var count int
-	if err := db.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name IN ('users', 'movies', 'challenges', 'challenge_movies', 'ratings', 'user_tokens')`).Scan(&count); err != nil || count != 0 {
+	if err := db.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name IN ('users', 'movies', 'challenges', 'challenge_movies', 'ratings', 'user_tokens', 'user_sessions')`).Scan(&count); err != nil || count != 0 {
 		t.Fatalf("tables after rollback = %d, error = %v", count, err)
 	}
 	if err := db.Close(); err != nil {
@@ -142,7 +145,7 @@ func TestSchemaRollbackAndRebuild(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name IN ('users', 'movies', 'challenges', 'challenge_movies', 'ratings', 'user_tokens')`).Scan(&count); err != nil || count != 6 {
+	if err := db.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name IN ('users', 'movies', 'challenges', 'challenge_movies', 'ratings', 'user_tokens', 'user_sessions')`).Scan(&count); err != nil || count != 7 {
 		t.Fatalf("tables after upgrade = %d, error = %v", count, err)
 	}
 }

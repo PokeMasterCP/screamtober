@@ -49,6 +49,15 @@ type User struct {
 	DisabledAt  sql.NullString
 }
 
+type UserSession struct {
+	SessionHash  []byte
+	UserID       int64
+	TokenHash    []byte
+	CreatedAt    string
+	ExpiresAt    int64
+	MaxExpiresAt int64
+}
+
 type UserToken struct {
 	UserID    int64
 	TokenHash []byte

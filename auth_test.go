@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -27,7 +28,7 @@ func TestLoginLogging(t *testing.T) {
 		{"success", testToken, "login successful", "info", ""},
 		{"invalid token", "invalid-token", "login failed", "warn", "invalid_token"},
 		{"invalid form", strings.Repeat("x", 4097), "login failed", "warn", "invalid_form"},
-		{"session limit", testToken, "login failed", "error", "session_limit"},
+		{"admin session limit", testAdminToken, "admin login failed", "error", "session_limit"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			var output bytes.Buffer
@@ -37,8 +38,8 @@ func TestLoginLogging(t *testing.T) {
 			}
 			a, h := authFixture(t, testToken, false)
 			if tt.reason == "session_limit" {
-				for i := 0; i < 128; i++ {
-					a.sessions[[32]byte{byte(i)}] = userSession{expiresAt: time.Now().Add(time.Hour)}
+				for i := 0; i < maxAdminSessions; i++ {
+					a.adminSessions[[32]byte{byte(i)}] = time.Now().Add(time.Hour)
 				}
 			}
 			r := httptest.NewRequest("POST", "/login", strings.NewReader(url.Values{"token": {tt.token}}.Encode()))
@@ -114,6 +115,11 @@ func authFixture(t *testing.T, token string, insecure bool) (*auth, http.Handler
 	if err != nil {
 		t.Fatal(err)
 	}
+	return a, authRoutes(t, a, db)
+}
+
+func authRoutes(t *testing.T, a *auth, db *sql.DB) http.Handler {
+	t.Helper()
 	h, err := newHandler(a, db)
 	if err != nil {
 		t.Fatal(err)
@@ -124,7 +130,7 @@ func authFixture(t *testing.T, token string, insecure bool) (*auth, http.Handler
 		_, _ = w.Write([]byte("protected content"))
 	})))
 	mux.Handle("/", h)
-	return a, mux
+	return mux
 }
 
 func authRequest(h http.Handler, method, path, token string, cookie *http.Cookie) *httptest.ResponseRecorder {
@@ -164,7 +170,7 @@ func TestAuthLifecycle(t *testing.T) {
 		t.Fatal("invalid token feedback missing")
 	}
 	cookie := loginCookie(t, h)
-	if !cookie.Secure || !cookie.HttpOnly || cookie.SameSite != http.SameSiteLaxMode || cookie.Path != "/" || cookie.MaxAge != 43200 || cookie.Value == testToken {
+	if !cookie.Secure || !cookie.HttpOnly || cookie.SameSite != http.SameSiteLaxMode || cookie.Path != "/" || cookie.MaxAge != 90*24*60*60 || cookie.Value == testToken {
 		t.Fatalf("unexpected session cookie attributes: secure=%v httponly=%v samesite=%v path=%s maxage=%d", cookie.Secure, cookie.HttpOnly, cookie.SameSite, cookie.Path, cookie.MaxAge)
 	}
 	w := authRequest(h, "GET", "/test/protected", "", cookie)
@@ -192,27 +198,105 @@ func TestAuthLifecycle(t *testing.T) {
 	}
 }
 
-func TestSessionExpiryRestartAndForgery(t *testing.T) {
+func TestSessionRestartExpiryAndForgery(t *testing.T) {
 	a, h := authFixture(t, testToken, true)
 	cookie := loginCookie(t, h)
 	if cookie.Secure {
 		t.Fatal("local HTTP override ignored")
 	}
-	_, restarted := authFixture(t, testToken, true)
-	if w := authRequest(restarted, "GET", "/test/protected", "", cookie); w.Code != 401 {
-		t.Fatal("session survived restart")
+	restartedAuth, err := newAuth(testAdminToken, true, a.db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	restarted := authRoutes(t, restartedAuth, a.db)
+	if w := authRequest(restarted, "GET", "/test/protected", "", cookie); w.Code != 200 {
+		t.Fatal("personal session did not survive restart")
+	}
+	var stored int
+	if err := a.db.QueryRow(`SELECT count(*) FROM user_sessions WHERE session_hash = ?`, []byte(cookie.Value)).Scan(&stored); err != nil || stored != 0 {
+		t.Fatal("raw session value stored")
 	}
 	forged := &http.Cookie{Name: sessionCookie, Value: "made-up-session"}
 	if w := authRequest(h, "GET", "/test/protected", "", forged); w.Code != 401 {
 		t.Fatal("forged cookie accepted")
 	}
-	a.sessions[sha256.Sum256([]byte(cookie.Value))] = userSession{expiresAt: time.Now().Add(-time.Second)}
+	setSessionExpiry(t, a, cookie, -time.Second, time.Hour)
 	if w := authRequest(h, "GET", "/test/protected", "", cookie); w.Code != 401 {
 		t.Fatal("expired session accepted")
 	}
-	if len(a.sessions) != 0 {
-		t.Fatal("expired session not removed")
+	if w := authRequest(h, "GET", "/test/protected", "", cookie); w.Code != 401 {
+		t.Fatal("expired session was renewed")
 	}
+}
+
+func TestSessionRenewal(t *testing.T) {
+	a, h := authFixture(t, testToken, true)
+	cookie := loginCookie(t, h)
+	now := time.Now()
+	if expires, _ := sessionExpiry(t, a, cookie); expires.Before(now.Add(sessionIdleTimeout - time.Minute)) {
+		t.Fatalf("new session expires at %v", expires)
+	}
+
+	// Use within the idle timeout extends the session.
+	setSessionExpiry(t, a, cookie, time.Hour, sessionMaxLifetime)
+	if w := authRequest(h, "GET", "/", "", cookie); !strings.Contains(w.Body.String(), ">Sign out</button>") {
+		t.Fatal("signed-in page did not recognize the session")
+	}
+	if expires, _ := sessionExpiry(t, a, cookie); expires.Before(now.Add(sessionIdleTimeout - time.Minute)) {
+		t.Fatalf("used session was not renewed: %v", expires)
+	}
+
+	// Renewal never passes the maximum lifetime.
+	setSessionExpiry(t, a, cookie, time.Hour, 2*time.Hour)
+	if w := authRequest(h, "GET", "/test/protected", "", cookie); w.Code != 200 {
+		t.Fatal("session rejected before its maximum lifetime")
+	}
+	if expires, maxExpires := sessionExpiry(t, a, cookie); !expires.Equal(maxExpires) {
+		t.Fatalf("renewal passed the maximum lifetime: %v > %v", expires, maxExpires)
+	}
+	setSessionExpiry(t, a, cookie, -time.Second, -time.Second)
+	if w := authRequest(h, "GET", "/test/protected", "", cookie); w.Code != 401 {
+		t.Fatal("session outlived its maximum lifetime")
+	}
+}
+
+func TestSessionsPerUserLimit(t *testing.T) {
+	a, h := authFixture(t, testToken, true)
+	first := loginCookie(t, h)
+	var latest *http.Cookie
+	for range sessionsPerUser {
+		latest = loginCookie(t, h)
+	}
+	var count int
+	if err := a.db.QueryRow(`SELECT count(*) FROM user_sessions`).Scan(&count); err != nil || count != sessionsPerUser {
+		t.Fatalf("stored sessions = %d, error = %v", count, err)
+	}
+	if w := authRequest(h, "GET", "/test/protected", "", first); w.Code != 401 {
+		t.Fatal("least recently used session was not replaced")
+	}
+	if w := authRequest(h, "GET", "/test/protected", "", latest); w.Code != 200 {
+		t.Fatal("newest session rejected")
+	}
+}
+
+func setSessionExpiry(t *testing.T, a *auth, cookie *http.Cookie, expires, maxExpires time.Duration) {
+	t.Helper()
+	hash := sha256.Sum256([]byte(cookie.Value))
+	now := time.Now()
+	result, err := a.db.Exec(`UPDATE user_sessions SET expires_at = ?, max_expires_at = ? WHERE session_hash = ?`, now.Add(expires).Unix(), now.Add(maxExpires).Unix(), hash[:])
+	if n, _ := result.RowsAffected(); err != nil || n != 1 {
+		t.Fatalf("update session expiry: %v", err)
+	}
+}
+
+func sessionExpiry(t *testing.T, a *auth, cookie *http.Cookie) (time.Time, time.Time) {
+	t.Helper()
+	hash := sha256.Sum256([]byte(cookie.Value))
+	var expires, maxExpires int64
+	if err := a.db.QueryRow(`SELECT expires_at, max_expires_at FROM user_sessions WHERE session_hash = ?`, hash[:]).Scan(&expires, &maxExpires); err != nil {
+		t.Fatal(err)
+	}
+	return time.Unix(expires, 0), time.Unix(maxExpires, 0)
 }
 
 func TestAuthCSRF(t *testing.T) {
