@@ -4,6 +4,9 @@ INSERT INTO users (display_name, role)
 VALUES (?, ?)
 RETURNING *;
 
+-- name: GetUser :one
+SELECT * FROM users WHERE id = ?;
+
 -- name: RenameUser :one
 UPDATE users SET display_name = ? WHERE id = ? RETURNING *;
 

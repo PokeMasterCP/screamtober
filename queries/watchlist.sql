@@ -38,7 +38,8 @@ UPDATE challenge_movies SET position = sqlc.narg(position)
 WHERE id = sqlc.arg(id) AND challenge_id = sqlc.arg(challenge_id);
 
 -- Preserve the first watched timestamp when another rating is submitted or edited.
+-- Affects one row only for the entry's first watch.
 -- name: MarkChallengeMovieWatched :execrows
 UPDATE challenge_movies
-SET watched_at = COALESCE(watched_at, CURRENT_TIMESTAMP)
-WHERE id = sqlc.arg(id) AND challenge_id = sqlc.arg(challenge_id);
+SET watched_at = CURRENT_TIMESTAMP
+WHERE id = sqlc.arg(id) AND challenge_id = sqlc.arg(challenge_id) AND watched_at IS NULL;

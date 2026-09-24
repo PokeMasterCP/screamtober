@@ -162,8 +162,8 @@ func (q *Queries) ListChallengeMovies(ctx context.Context, challengeID int64) ([
 
 const markChallengeMovieWatched = `-- name: MarkChallengeMovieWatched :execrows
 UPDATE challenge_movies
-SET watched_at = COALESCE(watched_at, CURRENT_TIMESTAMP)
-WHERE id = ?1 AND challenge_id = ?2
+SET watched_at = CURRENT_TIMESTAMP
+WHERE id = ?1 AND challenge_id = ?2 AND watched_at IS NULL
 `
 
 type MarkChallengeMovieWatchedParams struct {
@@ -172,6 +172,7 @@ type MarkChallengeMovieWatchedParams struct {
 }
 
 // Preserve the first watched timestamp when another rating is submitted or edited.
+// Affects one row only for the entry's first watch.
 func (q *Queries) MarkChallengeMovieWatched(ctx context.Context, arg MarkChallengeMovieWatchedParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, markChallengeMovieWatched, arg.ID, arg.ChallengeID)
 	if err != nil {

@@ -43,22 +43,28 @@ func (q *Queries) DeleteExpiredUserSessions(ctx context.Context, now int64) erro
 	return err
 }
 
-const deleteUserSession = `-- name: DeleteUserSession :exec
-DELETE FROM user_sessions WHERE session_hash = ?
+const deleteUserSession = `-- name: DeleteUserSession :one
+DELETE FROM user_sessions WHERE session_hash = ? RETURNING user_id
 `
 
-func (q *Queries) DeleteUserSession(ctx context.Context, sessionHash []byte) error {
-	_, err := q.db.ExecContext(ctx, deleteUserSession, sessionHash)
-	return err
+// Returns sql.ErrNoRows when the browser had no stored session.
+func (q *Queries) DeleteUserSession(ctx context.Context, sessionHash []byte) (int64, error) {
+	row := q.db.QueryRowContext(ctx, deleteUserSession, sessionHash)
+	var user_id int64
+	err := row.Scan(&user_id)
+	return user_id, err
 }
 
-const deleteUserSessions = `-- name: DeleteUserSessions :exec
+const deleteUserSessions = `-- name: DeleteUserSessions :execrows
 DELETE FROM user_sessions WHERE user_id = ?
 `
 
-func (q *Queries) DeleteUserSessions(ctx context.Context, userID int64) error {
-	_, err := q.db.ExecContext(ctx, deleteUserSessions, userID)
-	return err
+func (q *Queries) DeleteUserSessions(ctx context.Context, userID int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteUserSessions, userID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const getUserSession = `-- name: GetUserSession :one

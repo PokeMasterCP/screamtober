@@ -141,6 +141,23 @@ func TestRatingAuthorizationAndCSRF(t *testing.T) {
 	}
 }
 
+func TestRatingLogsFirstWatch(t *testing.T) {
+	db := schemaFixture(t)
+	h := challengeHTTPFixture(t, db)
+	cookie := loginCookie(t, h)
+	for _, firstWatch := range []bool{true, false} {
+		_, event := loggedRequest(t, h, formRequest("POST", "/challenges/2026/movies/1/rating", "score=4", cookie))
+		assertEvent(t, event, map[string]any{"event": "rating.save", "outcome": "success", "first_watch": firstWatch})
+		// Session lookup, challenge lookup, and the rating transaction's two writes.
+		if queries, _ := event["db_queries"].(float64); queries < 4 {
+			t.Fatalf("db_queries = %v: %v", event["db_queries"], event)
+		}
+		if ms, ok := event["db_ms"].(float64); !ok || ms <= 0 {
+			t.Fatalf("db_ms = %v", event["db_ms"])
+		}
+	}
+}
+
 func TestRatingDatabaseFailure(t *testing.T) {
 	db := schemaFixture(t)
 	h := challengeHTTPFixture(t, db)

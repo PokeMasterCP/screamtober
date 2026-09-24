@@ -93,6 +93,25 @@ func loggedRequest(t *testing.T, h http.Handler, r *http.Request) (*httptest.Res
 	return w, event
 }
 
+func formRequest(method, path, body string, cookies ...*http.Cookie) *http.Request {
+	r := httptest.NewRequest(method, path, strings.NewReader(body))
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	for _, cookie := range cookies {
+		r.AddCookie(cookie)
+	}
+	return r
+}
+
+// assertEvent checks expected fields; a nil value requires the field to be absent.
+func assertEvent(t *testing.T, event map[string]any, want map[string]any) {
+	t.Helper()
+	for key, value := range want {
+		if event[key] != value {
+			t.Fatalf("%s = %v, want %v: %v", key, event[key], value, event)
+		}
+	}
+}
+
 func TestRequestEventAccumulation(t *testing.T) {
 	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		startEvent(r, "user.create", "role", "member")
@@ -103,14 +122,11 @@ func TestRequestEventAccumulation(t *testing.T) {
 		w.WriteHeader(http.StatusInternalServerError)
 	})
 	_, event := loggedRequest(t, h, httptest.NewRequest("POST", "/", nil))
-	for key, want := range map[string]any{
+	assertEvent(t, event, map[string]any{
 		"message": "http request", "level": "error", "event": "user.create", "outcome": "success",
 		"user_id": float64(7), "role": "owner", "step": "render page", "error": "template failed",
-	} {
-		if event[key] != want {
-			t.Fatalf("%s = %v, want %v: %v", key, event[key], want, event)
-		}
-	}
+		"db_queries": nil, "db_ms": nil,
+	})
 	// Handlers used without logging middleware record nothing.
 	eventSucceeded(httptest.NewRequest("GET", "/", nil))
 }
@@ -129,7 +145,7 @@ func TestRequestEventRejections(t *testing.T) {
 		{"visitor rating", "POST", "/challenges/2026/movies/1/rating", "score=4", nil, 401, "warn",
 			map[string]any{"reason": "sign_in_required", "auth": "visitor", "route": "POST /challenges/{year}/movies/{id}/rating"}},
 		{"visitor admin page", "GET", "/admin/users", "", nil, 303, "info", map[string]any{"reason": "admin_required"}},
-		{"admin product page", "GET", "/", "", admin, 303, "info", map[string]any{"reason": "admin_session_active", "auth": "admin"}},
+		{"admin product page", "GET", "/", "", admin, 303, "info", map[string]any{"reason": "admin_session_active", "auth": "admin", "route": nil}},
 		{"cross-site form", "POST", "/logout", "", nil, 403, "warn", map[string]any{"reason": "cross_origin"}},
 		{"invalid score", "POST", "/challenges/2026/movies/1/rating", "score=6", personal, 400, "warn",
 			map[string]any{"event": "rating.save", "reason": "invalid_score", "auth": "personal", "user_id": float64(2), "year": float64(2026), "entry_id": float64(1)}},
@@ -156,11 +172,7 @@ func TestRequestEventRejections(t *testing.T) {
 			if w.Code != tt.status || event["level"] != tt.level || event["outcome"] != "rejected" {
 				t.Fatalf("status = %d, event = %v", w.Code, event)
 			}
-			for key, want := range tt.want {
-				if event[key] != want {
-					t.Fatalf("%s = %v, want %v: %v", key, event[key], want, event)
-				}
-			}
+			assertEvent(t, event, tt.want)
 		})
 	}
 }

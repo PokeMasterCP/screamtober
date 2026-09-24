@@ -68,6 +68,23 @@ func (q *Queries) EnableUser(ctx context.Context, id int64) (User, error) {
 	return i, err
 }
 
+const getUser = `-- name: GetUser :one
+SELECT id, display_name, role, created_at, disabled_at FROM users WHERE id = ?
+`
+
+func (q *Queries) GetUser(ctx context.Context, id int64) (User, error) {
+	row := q.db.QueryRowContext(ctx, getUser, id)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.DisplayName,
+		&i.Role,
+		&i.CreatedAt,
+		&i.DisabledAt,
+	)
+	return i, err
+}
+
 const renameUser = `-- name: RenameUser :one
 UPDATE users SET display_name = ? WHERE id = ? RETURNING id, display_name, role, created_at, disabled_at
 `

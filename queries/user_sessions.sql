@@ -14,10 +14,11 @@ WHERE s.session_hash = sqlc.arg(session_hash) AND s.expires_at > sqlc.arg(now) A
 -- name: RenewUserSession :exec
 UPDATE user_sessions SET expires_at = ? WHERE session_hash = ?;
 
--- name: DeleteUserSession :exec
-DELETE FROM user_sessions WHERE session_hash = ?;
+-- Returns sql.ErrNoRows when the browser had no stored session.
+-- name: DeleteUserSession :one
+DELETE FROM user_sessions WHERE session_hash = ? RETURNING user_id;
 
--- name: DeleteUserSessions :exec
+-- name: DeleteUserSessions :execrows
 DELETE FROM user_sessions WHERE user_id = ?;
 
 -- name: DeleteExpiredUserSessions :exec

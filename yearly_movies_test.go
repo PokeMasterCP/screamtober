@@ -14,14 +14,20 @@ func TestYearlyMovies(t *testing.T) {
 	ctx := context.Background()
 	db := schemaFixture(t)
 	movie := tmdb.MovieSummary{ID: 456, Title: "New pick"}
+	entries := make(map[int]int64)
 	for _, tt := range []struct {
-		year      int
-		ref       string
-		duplicate bool
-	}{{2028, "first", false}, {2028, "first", true}, {2028, "repeat", false}, {2029, "first", false}} {
-		duplicate, err := addYearlyMovie(ctx, db, movie, tt.year, tt.ref, "")
-		if err != nil || duplicate != tt.duplicate {
-			t.Fatal(duplicate, err)
+		year                  int
+		ref                   string
+		duplicate, catalogued bool
+	}{{2028, "first", false, true}, {2028, "first", true, false}, {2028, "repeat", false, false}, {2029, "first", false, false}} {
+		added, err := addYearlyMovie(ctx, db, movie, tt.year, tt.ref, "")
+		if err != nil || added.duplicate != tt.duplicate || added.catalogued != tt.catalogued || added.entryID == 0 {
+			t.Fatal(added, err)
+		}
+		if first, retry := entries[tt.year], added.entryID; tt.duplicate && retry != first {
+			t.Fatalf("retry reported entry %d, want %d", retry, first)
+		} else if !tt.duplicate && entries[tt.year] == 0 {
+			entries[tt.year] = added.entryID
 		}
 	}
 	q := store.New(db)

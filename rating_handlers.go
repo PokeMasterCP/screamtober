@@ -42,20 +42,17 @@ func (h *challengeHandler) rate(w http.ResponseWriter, r *http.Request) {
 		fail("get challenge", err)
 		return
 	}
+	var firstWatch bool
 	err = withTransaction(r.Context(), h.db, func(q *store.Queries) error {
+		// Returns sql.ErrNoRows unless the entry belongs to this year.
 		if _, err := q.UpsertRating(r.Context(), store.UpsertRatingParams{
 			UserID: user.ID, Score: int64(values[0][0] - '0'), ChallengeMovieID: id, ChallengeID: challenge.ID,
 		}); err != nil {
 			return err
 		}
-		count, err := q.MarkChallengeMovieWatched(r.Context(), store.MarkChallengeMovieWatchedParams{ID: id, ChallengeID: challenge.ID})
-		if err != nil {
-			return err
-		}
-		if count != 1 {
-			return sql.ErrNoRows
-		}
-		return nil
+		marked, err := q.MarkChallengeMovieWatched(r.Context(), store.MarkChallengeMovieWatchedParams{ID: id, ChallengeID: challenge.ID})
+		firstWatch = marked == 1
+		return err
 	})
 	if errors.Is(err, sql.ErrNoRows) {
 		eventRejected(r, "not_found")
@@ -66,6 +63,6 @@ func (h *challengeHandler) rate(w http.ResponseWriter, r *http.Request) {
 		fail("save rating", err)
 		return
 	}
-	eventSucceeded(r)
+	eventSucceeded(r, "first_watch", firstWatch)
 	http.Redirect(w, r, fmt.Sprintf("/challenges/%d#movie-%d", year, id), http.StatusSeeOther)
 }

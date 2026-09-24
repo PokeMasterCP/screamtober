@@ -17,10 +17,12 @@ type requestEventKey struct{}
 
 // requestEvent accumulates one request's operation details for its completion log.
 type requestEvent struct {
-	level   slog.Level
-	name    string
-	outcome string
-	attrs   []slog.Attr
+	level     slog.Level
+	name      string
+	outcome   string
+	attrs     []slog.Attr
+	dbQueries int
+	dbTime    time.Duration
 }
 
 // recordEvent adds fields to the request's completion log. Call it synchronously
@@ -45,6 +47,15 @@ next:
 			}
 		}
 		event.attrs = append(event.attrs, attr)
+	}
+}
+
+// recordDatabase adds a database call's time, and any queries it ran, to the
+// request's completion log.
+func recordDatabase(ctx context.Context, started time.Time, queries int) {
+	if event, ok := ctx.Value(requestEventKey{}).(*requestEvent); ok {
+		event.dbQueries += queries
+		event.dbTime += time.Since(started)
 	}
 }
 
@@ -149,8 +160,12 @@ func requestLogging(logger *slog.Logger, next http.Handler) http.Handler {
 			for _, attr := range event.attrs {
 				attrs = append(attrs, attr)
 			}
-			// ServeMux records the matched pattern on this request in place.
-			if r.Pattern != "" {
+			if event.dbQueries > 0 || event.dbTime > 0 {
+				attrs = append(attrs, "db_queries", event.dbQueries, "db_ms", float64(event.dbTime)/float64(time.Millisecond))
+			}
+			// ServeMux records the matched pattern on this request in place. The
+			// root catch-all means the request was refused before product routing.
+			if r.Pattern != "" && r.Pattern != "/" {
 				attrs = append(attrs, "route", r.Pattern)
 			}
 			requestLog.Log(r.Context(), max(level, event.level), "http request", append(attrs,
