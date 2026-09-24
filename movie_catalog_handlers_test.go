@@ -315,7 +315,7 @@ func TestAddMovieDatabaseFailureLog(t *testing.T) {
 	if err := json.Unmarshal(bytes.TrimSpace(logs.Bytes()), &event); err != nil {
 		t.Fatalf("expected one completion event: %s", logs.String())
 	}
-	if event["outcome"] != "database_failure" || event["level"] != "error" || !strings.Contains(fmt.Sprint(event["error"]), "catalog write failed") {
+	if event["event"] != "movie.add" || event["outcome"] != "failed" || event["step"] != "add movie" || event["level"] != "error" || !strings.Contains(fmt.Sprint(event["error"]), "catalog write failed") {
 		t.Fatalf("missing diagnostic: %v", event)
 	}
 }

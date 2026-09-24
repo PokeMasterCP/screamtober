@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -68,6 +69,96 @@ func TestRequestLogging(t *testing.T) {
 			for _, secret := range []string{"query-secret", "body-secret", "auth-secret", "cookie-secret", "untrusted-id"} {
 				if strings.Contains(output.String(), secret) {
 					t.Fatalf("log includes %s", secret)
+				}
+			}
+		})
+	}
+}
+
+// loggedRequest serves r with request logging and returns its single completion event.
+func loggedRequest(t *testing.T, h http.Handler, r *http.Request) (*httptest.ResponseRecorder, map[string]any) {
+	t.Helper()
+	var output bytes.Buffer
+	logger, err := newLogger(&output, "info")
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := httptest.NewRecorder()
+	requestLogging(logger, h).ServeHTTP(w, r)
+	var event map[string]any
+	// Unmarshal also rejects multiple records for one request.
+	if err := json.Unmarshal(output.Bytes(), &event); err != nil {
+		t.Fatalf("expected one completion event: %v\n%s", err, output.String())
+	}
+	return w, event
+}
+
+func TestRequestEventAccumulation(t *testing.T) {
+	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		startEvent(r, "user.create", "role", "member")
+		eventSucceeded(r, "user_id", 7, "role", "owner")
+		startEvent(r, "ignored")
+		// A committed change stays successful when its response fails.
+		eventFailed(r, "render page", errors.New("template failed"))
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+	_, event := loggedRequest(t, h, httptest.NewRequest("POST", "/", nil))
+	for key, want := range map[string]any{
+		"message": "http request", "level": "error", "event": "user.create", "outcome": "success",
+		"user_id": float64(7), "role": "owner", "step": "render page", "error": "template failed",
+	} {
+		if event[key] != want {
+			t.Fatalf("%s = %v, want %v: %v", key, event[key], want, event)
+		}
+	}
+	// Handlers used without logging middleware record nothing.
+	eventSucceeded(httptest.NewRequest("GET", "/", nil))
+}
+
+func TestRequestEventRejections(t *testing.T) {
+	db := schemaFixture(t)
+	h := challengeHTTPFixture(t, db)
+	personal, admin := loginCookie(t, h), adminCookie(t, h)
+	for _, tt := range []struct {
+		name, method, path, body string
+		cookie                   *http.Cookie
+		status                   int
+		level                    string
+		want                     map[string]any
+	}{
+		{"visitor rating", "POST", "/challenges/2026/movies/1/rating", "score=4", nil, 401, "warn",
+			map[string]any{"reason": "sign_in_required", "auth": "visitor", "route": "POST /challenges/{year}/movies/{id}/rating"}},
+		{"visitor admin page", "GET", "/admin/users", "", nil, 303, "info", map[string]any{"reason": "admin_required"}},
+		{"admin product page", "GET", "/", "", admin, 303, "info", map[string]any{"reason": "admin_session_active", "auth": "admin"}},
+		{"cross-site form", "POST", "/logout", "", nil, 403, "warn", map[string]any{"reason": "cross_origin"}},
+		{"invalid score", "POST", "/challenges/2026/movies/1/rating", "score=6", personal, 400, "warn",
+			map[string]any{"event": "rating.save", "reason": "invalid_score", "auth": "personal", "user_id": float64(2), "year": float64(2026), "entry_id": float64(1)}},
+		{"missing entry", "POST", "/challenges/2026/movies/99/rating", "score=4", personal, 404, "warn",
+			map[string]any{"event": "rating.save", "reason": "not_found", "entry_id": float64(99)}},
+		{"household full", "POST", "/admin/users", "display_name=Another&role=owner", admin, 409, "warn",
+			map[string]any{"event": "user.create", "reason": "household_full", "auth": "admin"}},
+		{"missing profile", "POST", "/admin/users/999/disable", "", admin, 404, "warn",
+			map[string]any{"event": "user.disable", "reason": "not_found", "user_id": float64(999)}},
+		{"stale calendar", "POST", "/admin/calendar?year=2026", "revision=stale", admin, 409, "warn",
+			map[string]any{"event": "calendar.save", "reason": "stale_revision", "year": float64(2026)}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			r := httptest.NewRequest(tt.method, tt.path, strings.NewReader(tt.body))
+			r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			if tt.name == "cross-site form" {
+				r.Header.Set("Sec-Fetch-Site", "cross-site")
+				r.Header.Set("Origin", "https://attacker.example")
+			}
+			if tt.cookie != nil {
+				r.AddCookie(tt.cookie)
+			}
+			w, event := loggedRequest(t, h, r)
+			if w.Code != tt.status || event["level"] != tt.level || event["outcome"] != "rejected" {
+				t.Fatalf("status = %d, event = %v", w.Code, event)
+			}
+			for key, want := range tt.want {
+				if event[key] != want {
+					t.Fatalf("%s = %v, want %v: %v", key, event[key], want, event)
 				}
 			}
 		})

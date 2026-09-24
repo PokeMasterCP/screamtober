@@ -73,11 +73,26 @@ breaking cross-origin request protection.
 
 ## Logging
 
-Write structured JSON with request ID, client IP, method, path, status, duration,
-and response size. Use one completion event per HTTP request; handlers call
-`setRequestEvent` synchronously to add operation, outcome, and relevant errors.
-Avoid separate handler and access logs for the same event. Independent startup
-and lifecycle events get their own records.
+Write structured JSON. Each HTTP request produces one `http request` completion
+record with request ID, client IP, method, path, matched `route`, status,
+duration, and response size. Handlers add to that record synchronously with the
+helpers in `request_logging.go`; never log a request separately. Independent
+startup and lifecycle events get their own records.
+
+- `startEvent` names the operation as `noun.verb` (such as `rating.save` or
+  `user.disable`; sign-in is `login`). Page views stay unnamed.
+- `eventSucceeded`, `eventRejected`, and `eventFailed` set `outcome` to `success`,
+  `rejected`, or `failed`. The first outcome is kept, so a response that fails
+  after a committed change still reports the change. Later fields replace earlier
+  ones with the same key.
+- Rejections carry a snake_case `reason`. Failures carry the `step` that failed
+  and its `error`, plus a `reason` when the cause is classified (such as TMDB's
+  `rate_limited`).
+- The session check records `auth` (`visitor`, `personal`, or `admin`).
+  `user_id` is the profile the request acted as or on. Use `year`, `entry_id`
+  (challenge entry), and `tmdb_id` for identifiers.
+- The level follows the status (errors for 5xx and aborted requests, warnings
+  for 4xx) and only rises when a handler asks, as failed sign-ins do.
 
 Never log credentials, cookies, authorization headers, request bodies, or complete
 query strings. Validated search titles are intentionally recorded as `search_term`;

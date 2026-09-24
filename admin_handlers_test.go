@@ -295,7 +295,7 @@ func TestPortalValidationAndLogging(t *testing.T) {
 		if strings.Contains(logs.String(), token) || strings.Contains(logs.String(), admin.Value) || strings.Contains(logs.String(), testAdminToken) {
 			t.Fatal("credential leaked into logs")
 		}
-		if !strings.Contains(logs.String(), `"message":"user created"`) {
+		if !strings.Contains(logs.String(), `"event":"user.create","outcome":"success"`) {
 			t.Fatal("missing user creation event")
 		}
 	}

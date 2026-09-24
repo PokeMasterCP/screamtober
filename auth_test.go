@@ -23,12 +23,12 @@ const testToken = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abc
 
 func TestLoginLogging(t *testing.T) {
 	for _, tt := range []struct {
-		name, token, message, level, reason string
+		name, token, outcome, level, reason string
 	}{
-		{"success", testToken, "login successful", "info", ""},
-		{"invalid token", "invalid-token", "login failed", "warn", "invalid_token"},
-		{"invalid form", strings.Repeat("x", 4097), "login failed", "warn", "invalid_form"},
-		{"admin session limit", testAdminToken, "admin login failed", "error", "session_limit"},
+		{"success", testToken, "success", "info", ""},
+		{"invalid token", "invalid-token", "rejected", "warn", "invalid_token"},
+		{"invalid form", strings.Repeat("x", 4097), "rejected", "warn", "invalid_form"},
+		{"admin session limit", testAdminToken, "rejected", "error", "session_limit"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			var output bytes.Buffer
@@ -58,7 +58,7 @@ func TestLoginLogging(t *testing.T) {
 			if err := json.Unmarshal(lines[0], &event); err != nil {
 				t.Fatal(err)
 			}
-			if event["message"] != tt.message || event["level"] != tt.level || event["time"] == nil {
+			if event["message"] != "http request" || event["event"] != "login" || event["outcome"] != tt.outcome || event["level"] != tt.level || event["time"] == nil {
 				t.Fatalf("unexpected event: %v", event)
 			}
 			if tt.reason == "" {
@@ -366,7 +366,7 @@ func TestSuccessfulLoginConfirmation(t *testing.T) {
 			if err := json.Unmarshal(output.Bytes(), &event); err != nil {
 				t.Fatal(err)
 			}
-			if event["status"] != float64(200) || !strings.Contains(event["message"].(string), "login successful") {
+			if event["status"] != float64(200) || event["event"] != "login" || event["outcome"] != "success" || event["session"] != tt.name {
 				t.Fatalf("unexpected event: %v", event)
 			}
 		})

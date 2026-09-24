@@ -11,6 +11,7 @@ func protectCrossOrigin(next http.Handler) http.Handler {
 	protection := http.NewCrossOriginProtection()
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := protection.Check(r); err != nil && !originMatchesHost(r) {
+			eventRejected(r, "cross_origin")
 			http.Error(w, err.Error(), http.StatusForbidden)
 			return
 		}

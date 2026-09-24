@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"path/filepath"
 	"strings"
@@ -200,15 +201,16 @@ func TestMovieSearchCompletionLog(t *testing.T) {
 	}
 	cookie := adminCookie(t, h)
 	for _, tt := range []struct {
-		name, query, message, outcome string
-		err                           error
+		name, query, outcome, reason string
+		err                          error
 	}{
-		{"form", "", "http request", "", nil},
-		{"success", "?q=%20Halloween%20%26%20II%20&api_key=excluded-secret", "movie search", "success", nil},
-		{"validation", "?q=", "movie search", "invalid_query", nil},
-		{"configuration", "?q=%20Halloween%20%26%20II%20&api_key=excluded-secret", "movie search", "not_configured", tmdb.ErrNotConfigured},
-		{"rate limit", "?q=%20Halloween%20%26%20II%20&api_key=excluded-secret", "movie search", "rate_limited", tmdb.ErrRateLimited},
-		{"failure", "?q=%20Halloween%20%26%20II%20&api_key=excluded-secret", "movie search", "upstream_failure", tmdb.ErrUnavailable},
+		{"form", "", "", "", nil},
+		{"success", "?q=%20Halloween%20%26%20II%20&api_key=excluded-secret", "success", "", nil},
+		{"validation", "?q=", "rejected", "invalid_query", nil},
+		{"configuration", "?q=%20Halloween%20%26%20II%20&api_key=excluded-secret", "failed", "not_configured", tmdb.ErrNotConfigured},
+		{"rate limit", "?q=%20Halloween%20%26%20II%20&api_key=excluded-secret", "failed", "rate_limited", tmdb.ErrRateLimited},
+		{"rejected key", "?q=%20Halloween%20%26%20II%20&api_key=excluded-secret", "failed", "unauthorized", tmdb.ErrUnauthorized},
+		{"failure", "?q=%20Halloween%20%26%20II%20&api_key=excluded-secret", "failed", "upstream_error", tmdb.ErrUnavailable},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			// Each scenario needs a cache miss to exercise its upstream outcome.
@@ -225,18 +227,23 @@ func TestMovieSearchCompletionLog(t *testing.T) {
 			if err := json.Unmarshal(output.Bytes(), &entry); err != nil {
 				t.Fatal(err)
 			}
-			if entry["message"] != tt.message {
-				t.Fatalf("unexpected message: %v", entry)
+			field := func(key string) string { value, _ := entry[key].(string); return value }
+			wantEvent := "movie.search"
+			if tt.outcome == "" {
+				wantEvent = ""
 			}
-			if tt.outcome != "" && entry["outcome"] != tt.outcome {
+			if entry["message"] != "http request" || field("event") != wantEvent {
+				t.Fatalf("unexpected event: %v", entry)
+			}
+			if field("outcome") != tt.outcome || field("reason") != tt.reason {
 				t.Fatalf("unexpected outcome: %v", entry)
 			}
-			if _, exists := entry["operation"]; exists {
-				t.Fatal("redundant operation field")
+			if tt.err != nil && entry["error"] != tt.err.Error() {
+				t.Fatalf("upstream error missing: %v", entry)
 			}
-			if tt.outcome != "" && tt.outcome != "invalid_query" {
-				if entry["search_term"] != "Halloween & II" {
-					t.Fatalf("unexpected search term: %v", entry)
+			if tt.outcome == "success" || tt.outcome == "failed" {
+				if entry["search_term"] != "Halloween & II" || entry["tmdb_cache"] != "miss" {
+					t.Fatalf("unexpected search details: %v", entry)
 				}
 			} else if _, exists := entry["search_term"]; exists {
 				t.Fatal("search term logged without a valid search")
@@ -246,4 +253,16 @@ func TestMovieSearchCompletionLog(t *testing.T) {
 			}
 		})
 	}
+	t.Run("cached page", func(t *testing.T) {
+		stub.err = nil
+		cookie := adminCookie(t, h)
+		portalRequest(h, "GET", "/admin/movies/search?q=Halloween", nil, cookie)
+		calls := stub.calls
+		r := httptest.NewRequest("GET", "/admin/movies/search?q=Halloween", nil)
+		r.AddCookie(cookie)
+		_, entry := loggedRequest(t, h, r)
+		if stub.calls != calls || entry["outcome"] != "success" || entry["tmdb_cache"] != "hit" || entry["tmdb_ms"] != nil {
+			t.Fatalf("cached search must not call TMDB: %v", entry)
+		}
+	})
 }

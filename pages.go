@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"html/template"
-	"log/slog"
 	"net/http"
 )
 
@@ -11,7 +10,7 @@ import (
 func renderPage(w http.ResponseWriter, r *http.Request, pages *template.Template, name string, status int, data any) {
 	var body bytes.Buffer
 	if err := pages.ExecuteTemplate(&body, name, data); err != nil {
-		setRequestEvent(r, slog.LevelError, "render page failed", "template", name, "error", err)
+		eventFailed(r, "render page", err, "template", name)
 		http.Error(w, "Unable to load page. Please try again later.", http.StatusInternalServerError)
 		return
 	}
