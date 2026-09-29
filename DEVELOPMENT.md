@@ -71,6 +71,8 @@ Unmatched requests, including unsupported methods on known paths, return the
 `not_found.html` page through a catch-all route, so a wrong method is a 404 rather
 than a 405. GET pages with a missing resource, such as an unknown challenge year,
 use `renderNotFound`; form and admin action endpoints keep plain-text errors.
+`/robots.txt` asks crawlers not to index the site; it is served outside the
+admin/product session boundary like the bundled assets.
 
 Keep `Referrer-Policy: strict-origin`: browsers may omit `Sec-Fetch-Site` on HTTP
 private-IP hosts, and `no-referrer` can produce `Origin: null` on form POSTs,
@@ -104,7 +106,9 @@ non-secret settings.
   record carries `db_queries` and `db_ms`. The time includes waiting for the
   single connection and running each statement to its first row.
 - The level follows the status (errors for 5xx and aborted requests, warnings
-  for 4xx) and only rises when a handler asks, as failed sign-ins do.
+  for 4xx) and only rises when a handler asks, as failed sign-ins do. Missing
+  pages recorded with `eventNotFound` stay at info because stale links and
+  scanners make them routine; rejected actions on missing entries still warn.
 
 Never log credentials, cookies, authorization headers, request bodies, or complete
 query strings. Validated search titles are intentionally recorded as `search_term`;

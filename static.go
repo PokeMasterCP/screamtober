@@ -9,7 +9,18 @@ import (
 //go:embed static/fonts/*.ttf static/fonts/OFL.txt static/services/*
 var assetFiles embed.FS
 
+// The site is for a household, so ask well-behaved crawlers not to index it.
+// robots.txt is advisory; it does not replace authentication.
+const robotsTxt = "User-agent: *\nDisallow: /\n"
+
+func serveRobots(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	_, _ = w.Write([]byte(robotsTxt))
+}
+
 func registerAssetRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("GET /robots.txt", serveRobots)
 	assets, _ := assetFiles.ReadDir("static/services")
 	for _, asset := range assets {
 		name := asset.Name()

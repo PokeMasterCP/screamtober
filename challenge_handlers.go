@@ -87,14 +87,14 @@ func (h *challengeHandler) byYear(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	year, ok := canonicalPathYear(r)
 	if !ok {
-		eventRejected(r, "invalid_path")
+		eventNotFound(r, "invalid_path")
 		renderNotFound(w, r, h.pages)
 		return
 	}
 	addEventAttrs(r, "year", year)
 	challenge, err := h.queries.GetChallengeByYear(r.Context(), year)
 	if errors.Is(err, sql.ErrNoRows) {
-		eventRejected(r, "not_found")
+		eventNotFound(r, "not_found")
 		renderNotFound(w, r, h.pages)
 		return
 	}
