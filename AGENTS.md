@@ -97,7 +97,10 @@ without unnecessary approval requests.
 Create feature branches from up-to-date `main` and open PRs directly into `main`.
 Use `<type>(service): summary` titles, such as `feat(watchlist): add viewing services`.
 CI checks PRs and pushes to `main`; test changes in the temporary PR environment
-before merging. There is no staging promotion step.
+before merging. There is no staging promotion step. PR environments copy
+production settings, including `CLOUDFLARE_TUNNEL=true`, but are reached through
+a direct public URL, so logged client IPs there can be spoofed. This is expected;
+do not change their configuration. Verify normal-mode IP handling locally instead.
 
 - Format changed Go code with `gofmt` and run relevant checks, including
   `go test ./...` for Go changes. Test behavior, especially authorization, year
