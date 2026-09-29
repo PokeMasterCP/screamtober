@@ -21,3 +21,8 @@ func renderPage(w http.ResponseWriter, r *http.Request, pages *template.Template
 	w.WriteHeader(status)
 	_, _ = body.WriteTo(w)
 }
+
+// renderNotFound answers a missing page with the site's 404 page.
+func renderNotFound(w http.ResponseWriter, r *http.Request, pages *template.Template) {
+	renderPage(w, r, pages, "not_found.html", http.StatusNotFound, nil)
+}

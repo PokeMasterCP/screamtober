@@ -167,7 +167,7 @@ func TestAdminOnboardingAndPermissionSeparation(t *testing.T) {
 	if w := portalRequest(h, "GET", "/admin/login", nil); w.Code != 303 || w.Header().Get("Location") != "/login" {
 		t.Fatal("legacy login link does not redirect")
 	}
-	if w := authRequest(h, "POST", "/admin/login", token, nil); w.Code != 405 {
+	if w := authRequest(h, "POST", "/admin/login", token, nil); w.Code != 404 {
 		t.Fatal("legacy login endpoint still accepts credentials")
 	}
 }
@@ -187,7 +187,7 @@ func TestAdminRoutesRequireAdminAndSameOrigin(t *testing.T) {
 			}
 		}
 		if path != "/admin/users" {
-			if w := portalRequest(h, "GET", path, nil, admin); w.Code != 405 {
+			if w := portalRequest(h, "GET", path, nil, admin); w.Code != 404 {
 				t.Fatalf("GET mutation %s = %d", path, w.Code)
 			}
 		}

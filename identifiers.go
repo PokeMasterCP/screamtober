@@ -10,10 +10,15 @@ func parseYear(value string) (int64, bool) {
 	return year, err == nil && year >= 1 && year <= 9999
 }
 
-func pathYear(w http.ResponseWriter, r *http.Request) (int64, bool) {
+func canonicalPathYear(r *http.Request) (int64, bool) {
 	raw := r.PathValue("year")
 	year, ok := parseYear(raw)
-	if !ok || strconv.FormatInt(year, 10) != raw {
+	return year, ok && strconv.FormatInt(year, 10) == raw
+}
+
+func pathYear(w http.ResponseWriter, r *http.Request) (int64, bool) {
+	year, ok := canonicalPathYear(r)
+	if !ok {
 		eventRejected(r, "invalid_path")
 		http.NotFound(w, r)
 		return 0, false

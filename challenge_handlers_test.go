@@ -125,7 +125,7 @@ func TestChallengeEscapingAndSignedInState(t *testing.T) {
 			}
 			response := httptest.NewRecorder()
 			h.ServeHTTP(response, write)
-			if response.Code != http.StatusMethodNotAllowed {
+			if response.Code != http.StatusNotFound {
 				t.Fatalf("%s status = %d", method, response.Code)
 			}
 		}
