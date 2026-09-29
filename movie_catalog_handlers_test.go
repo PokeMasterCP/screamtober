@@ -124,10 +124,10 @@ func TestUpdateViewingServiceAndDeleteMovie(t *testing.T) {
 	if strings.Contains(body, "Change movie") || strings.Contains(body, "Choosing replacement") || strings.Contains(body, "entry_id") {
 		t.Fatal("replacement flow remains in the lineup UI")
 	}
-	if w := portalRequest(h, "GET", "/admin/challenges/2026/movies/1/service", nil, admin); w.Code != http.StatusMethodNotAllowed {
+	if w := portalRequest(h, "GET", "/admin/challenges/2026/movies/1/service", nil, admin); w.Code != http.StatusNotFound {
 		t.Fatal("GET service endpoint allowed")
 	}
-	if w := portalRequest(h, "GET", "/admin/challenges/2026/movies/1/delete", nil, admin); w.Code != http.StatusMethodNotAllowed {
+	if w := portalRequest(h, "GET", "/admin/challenges/2026/movies/1/delete", nil, admin); w.Code != http.StatusNotFound {
 		t.Fatal("GET delete endpoint allowed")
 	}
 	if w := portalRequest(h, "POST", "/admin/challenges/2026/movies/1/service", url.Values{"viewing_service": {"netflix"}}); w.Code != http.StatusForbidden {

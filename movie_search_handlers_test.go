@@ -173,7 +173,7 @@ func TestMovieSearchRequiresAdmin(t *testing.T) {
 	}
 	cookie := adminCookie(t, h)
 	w := portalRequest(h, "POST", "/admin/movies/search", nil, cookie)
-	if w.Code != http.StatusMethodNotAllowed {
+	if w.Code != http.StatusNotFound {
 		t.Fatalf("POST = %d", w.Code)
 	}
 	if stub.calls != 0 {

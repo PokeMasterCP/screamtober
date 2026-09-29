@@ -39,6 +39,42 @@ func TestBundledFontsAcrossSessions(t *testing.T) {
 	}
 }
 
+func TestNotFoundPage(t *testing.T) {
+	for _, session := range []string{"visitor", "personal", "admin"} {
+		t.Run(session, func(t *testing.T) {
+			_, handler := authFixture(t, testToken, true)
+			var cookie *http.Cookie
+			if session == "personal" {
+				cookie = loginCookie(t, handler)
+			} else if session == "admin" {
+				login := authRequest(handler, "POST", "/login", testAdminToken, nil)
+				cookie = activeSessionCookie(t, login, adminSessionCookie)
+			}
+			for _, tt := range []struct{ method, path string }{
+				{"GET", "/admin/missing"},
+				{"GET", "/challenges/2025"},
+				{"GET", "/challenges/nonsense"},
+				{"POST", "/login/extra"},
+				{"PUT", "/login"},
+			} {
+				w := authRequest(handler, tt.method, tt.path, "", cookie)
+				if session == "admin" && !strings.HasPrefix(tt.path, "/admin/") {
+					// The admin/product boundary applies before routing.
+					if w.Code == http.StatusNotFound {
+						t.Fatalf("%s %s: admin session reached a product 404", tt.method, tt.path)
+					}
+					continue
+				}
+				body := w.Body.String()
+				if w.Code != http.StatusNotFound || w.Header().Get("Content-Type") != "text/html; charset=utf-8" ||
+					!strings.Contains(body, "<h1>Page not found</h1>") || !strings.Contains(body, `href="/"`) {
+					t.Fatalf("%s %s: status %d, type %q, body %q", tt.method, tt.path, w.Code, w.Header().Get("Content-Type"), body)
+				}
+			}
+		})
+	}
+}
+
 func TestRoutes(t *testing.T) {
 	_, handler := authFixture(t, testToken, false)
 	for _, tt := range []struct {
@@ -50,7 +86,7 @@ func TestRoutes(t *testing.T) {
 		{"credits", http.MethodGet, "/credits", http.StatusOK},
 		{"unknown page", http.MethodGet, "/missing", http.StatusNotFound},
 		{"removed auth status", http.MethodGet, "/auth/status", http.StatusNotFound},
-		{"unsupported method", http.MethodPost, "/", http.StatusMethodNotAllowed},
+		{"unsupported method", http.MethodPost, "/", http.StatusNotFound},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			response := httptest.NewRecorder()

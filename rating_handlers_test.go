@@ -119,7 +119,7 @@ func TestRatingAuthorizationAndCSRF(t *testing.T) {
 				want = 403
 			case "get":
 				r.Method = "GET"
-				want = 405
+				want = 404
 			}
 			if cookie != nil {
 				r.AddCookie(cookie)

@@ -184,7 +184,7 @@ func TestAuthLifecycle(t *testing.T) {
 	if !strings.Contains(w.Body.String(), "<title>Screamtober · Signed in</title>") {
 		t.Fatal("signed-in page title missing")
 	}
-	if w := authRequest(h, "GET", "/logout", "", cookie); w.Code != 405 {
+	if w := authRequest(h, "GET", "/logout", "", cookie); w.Code != 404 {
 		t.Fatal("GET logout allowed")
 	}
 	if w := authRequest(h, "POST", "/logout", "", cookie); w.Code != 303 || w.Result().Cookies()[0].MaxAge != -1 {

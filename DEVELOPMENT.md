@@ -67,6 +67,11 @@ queries; keep them free of extra queries and live TMDB requests. Calendar nights
 use `moviePosterThumbURL` for smaller TMDB images. Keep server-side validation, conflict detection, and
 rollback coverage for calendar arrangement.
 
+Unmatched requests, including unsupported methods on known paths, return the
+`not_found.html` page through a catch-all route, so a wrong method is a 404 rather
+than a 405. GET pages with a missing resource, such as an unknown challenge year,
+use `renderNotFound`; form and admin action endpoints keep plain-text errors.
+
 Keep `Referrer-Policy: strict-origin`: browsers may omit `Sec-Fetch-Site` on HTTP
 private-IP hosts, and `no-referrer` can produce `Origin: null` on form POSTs,
 breaking cross-origin request protection.
