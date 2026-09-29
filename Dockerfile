@@ -2,12 +2,10 @@ FROM golang:1.27.0 AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
-COPY *.go ./
-COPY templates/ ./templates/
-COPY static/ ./static/
+COPY cmd/ ./cmd/
 COPY migrations/ ./migrations/
 COPY internal/ ./internal/
-RUN CGO_ENABLED=0 go build -trimpath -o /out/screamtober .
+RUN CGO_ENABLED=0 go build -trimpath -o /out/screamtober ./cmd/screamtober
 RUN mkdir -p /out/data && chown 65532:65532 /out/data
 
 FROM scratch

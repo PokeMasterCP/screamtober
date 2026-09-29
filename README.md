@@ -154,7 +154,7 @@ Install Go 1.27.0, clone the repository, and set the tokens above. From the
 repository root, run:
 
 ```sh
-AUTH_INSECURE_COOKIE=true go run .
+AUTH_INSECURE_COOKIE=true go run ./cmd/screamtober
 ```
 
 Open [localhost:8080](http://127.0.0.1:8080). Data is saved in `data/screamtober.db`.
