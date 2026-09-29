@@ -39,6 +39,29 @@ func TestBundledFontsAcrossSessions(t *testing.T) {
 	}
 }
 
+func TestRobotsTxtAcrossSessions(t *testing.T) {
+	for _, session := range []string{"visitor", "personal", "admin"} {
+		t.Run(session, func(t *testing.T) {
+			_, handler := authFixture(t, testToken, true)
+			var cookie *http.Cookie
+			if session == "personal" {
+				cookie = loginCookie(t, handler)
+			} else if session == "admin" {
+				login := authRequest(handler, "POST", "/login", testAdminToken, nil)
+				cookie = activeSessionCookie(t, login, adminSessionCookie)
+			}
+			w := authRequest(handler, "GET", "/robots.txt", "", cookie)
+			if w.Code != http.StatusOK || w.Header().Get("Content-Type") != "text/plain; charset=utf-8" ||
+				w.Body.String() != "User-agent: *\nDisallow: /\n" {
+				t.Fatalf("robots.txt: status %d, type %q, body %q", w.Code, w.Header().Get("Content-Type"), w.Body.String())
+			}
+			if w := authRequest(handler, "POST", "/robots.txt", "", cookie); w.Code == http.StatusOK {
+				t.Fatal("robots.txt accepted a write")
+			}
+		})
+	}
+}
+
 func TestNotFoundPage(t *testing.T) {
 	for _, session := range []string{"visitor", "personal", "admin"} {
 		t.Run(session, func(t *testing.T) {

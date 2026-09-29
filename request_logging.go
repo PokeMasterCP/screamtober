@@ -21,6 +21,7 @@ type requestEvent struct {
 	name      string
 	outcome   string
 	attrs     []slog.Attr
+	notFound  bool
 	dbQueries int
 	dbTime    time.Duration
 }
@@ -78,6 +79,15 @@ func eventSucceeded(r *http.Request, attrs ...any) {
 // eventRejected records a refused request; its response status sets the level.
 func eventRejected(r *http.Request, reason string, attrs ...any) {
 	recordEvent(r, slog.LevelInfo, "rejected", append([]any{"reason", reason}, attrs...)...)
+}
+
+// eventNotFound records a missing page. Stale links and scanners make these
+// routine, so unlike other rejections it stays at info level.
+func eventNotFound(r *http.Request, reason string, attrs ...any) {
+	if event, ok := r.Context().Value(requestEventKey{}).(*requestEvent); ok {
+		event.notFound = true
+	}
+	eventRejected(r, reason, attrs...)
 }
 
 // eventFailed records an internal failure and the step that failed.
@@ -147,7 +157,7 @@ func requestLogging(logger *slog.Logger, next http.Handler) http.Handler {
 			level := slog.LevelInfo
 			if !completed || status >= 500 {
 				level = slog.LevelError
-			} else if status >= 400 {
+			} else if status >= 400 && !event.notFound {
 				level = slog.LevelWarn
 			}
 			var attrs []any
