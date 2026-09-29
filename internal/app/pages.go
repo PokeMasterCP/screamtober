@@ -1,0 +1,28 @@
+package app
+
+import (
+	"bytes"
+	"html/template"
+	"net/http"
+)
+
+// Buffer before committing the status so template failures cannot return partial HTML.
+func renderPage(w http.ResponseWriter, r *http.Request, pages *template.Template, name string, status int, data any) {
+	var body bytes.Buffer
+	if err := pages.ExecuteTemplate(&body, name, data); err != nil {
+		eventFailed(r, "render page", err, "template", name)
+		http.Error(w, "Unable to load page. Please try again later.", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	// no-referrer makes some browsers send Origin: null, which fails CSRF checks
+	// on HTTP private-IP origins where Sec-Fetch-Site is also omitted.
+	w.Header().Set("Referrer-Policy", "strict-origin")
+	w.WriteHeader(status)
+	_, _ = body.WriteTo(w)
+}
+
+// renderNotFound answers a missing page with the site's 404 page.
+func renderNotFound(w http.ResponseWriter, r *http.Request, pages *template.Template) {
+	renderPage(w, r, pages, "not_found.html", http.StatusNotFound, nil)
+}

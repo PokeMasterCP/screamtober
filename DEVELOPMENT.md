@@ -3,6 +3,22 @@
 See [README.md](README.md) to run the app and [AGENTS.md](AGENTS.md) for product,
 security, and contribution rules.
 
+## Project layout
+
+- `cmd/screamtober/main.go` is the executable entry point. Run it from the
+  repository root with `go run ./cmd/screamtober`.
+- `internal/app/` contains application code and its tests. `run.go` configures
+  and starts the server; `routes.go` wires handlers and middleware. Feature
+  handlers, authentication, database helpers, and request logging share this
+  package. Shared test fixtures live in `test_helpers_test.go`.
+- `internal/app/templates/` and `internal/app/static/` hold embedded pages,
+  fonts, icons, and their licenses.
+- `internal/store/` contains sqlc-generated database access; `internal/tmdb/`
+  contains the server-side TMDB client.
+- `queries/` holds SQL query sources. `migrations/` holds versioned Goose SQL
+  migrations and `embed.go`, which bundles them for startup and migration tests.
+- `data/` is ignored local runtime storage, separate from application sources.
+
 ## Tools and checks
 
 Use Go 1.27.0 (`go.mod`). From the repository root, format changed Go files with
@@ -23,6 +39,7 @@ sqlc compile
 ```
 
 `sqlc.yaml` reads `migrations/` as its schema and generates `internal/store/`.
+The directive in `internal/app/generate.go` explicitly selects this root config.
 Never hand-edit generated code. Keep only queries needed by the app; tests can
 inspect fixtures with parameterized SQL.
 
