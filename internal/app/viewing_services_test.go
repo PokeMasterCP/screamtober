@@ -130,3 +130,13 @@ func TestRetiredViewingService(t *testing.T) {
 		t.Fatal("historical service lost", service)
 	}
 }
+
+func TestViewingServiceIDsAreUnique(t *testing.T) {
+	seen := map[string]bool{}
+	for _, service := range viewingServices {
+		if service.ID == "" || seen[service.ID] {
+			t.Fatal("persisted service IDs must be unique and non-empty", service)
+		}
+		seen[service.ID] = true
+	}
+}
