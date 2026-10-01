@@ -178,11 +178,17 @@ if (carousel) {
     }
   }
 
+  // Cards snap inside the scroll padding, so an item's offset alone overshoots
+  // its snap point and mandatory snapping pulls the carousel back.
+  function snapLeft(item) {
+    return item.offsetLeft - (parseFloat(getComputedStyle(carousel).scrollPaddingLeft) || 0);
+  }
+
   function move(direction) {
     const target = direction > 0
-      ? items.find(item => item.offsetLeft > carousel.scrollLeft + 1)
-      : items.findLast(item => item.offsetLeft < carousel.scrollLeft - 1);
-    if (target) carousel.scrollTo({ left: target.offsetLeft, behavior: reducedMotion.matches ? 'instant' : 'smooth' });
+      ? items.find(item => snapLeft(item) > carousel.scrollLeft + 1)
+      : items.findLast(item => snapLeft(item) < carousel.scrollLeft - 1);
+    if (target) carousel.scrollTo({ left: snapLeft(target), behavior: reducedMotion.matches ? 'instant' : 'smooth' });
   }
 
   previous.addEventListener('click', () => move(-1));
