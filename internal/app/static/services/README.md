@@ -23,6 +23,8 @@ Sources (downloaded October 1, 2026), placed on a brand-colored square tile:
   ([pluto.tv](https://pluto.tv/) apple-touch icon), and Fandango at Home
   ([athome.fandango.com](https://athome.fandango.com/) apple-touch icon).
 - In theaters: original popcorn bucket icon for this project.
+- Video on demand (rental): original price tag and play button icon for this project,
+  for movies rented or bought online rather than watched on a subscription service.
 
 Brand marks belong to their respective owners. The icons identify the selected
 viewing service and do not imply affiliation. Assets are served locally; no logo

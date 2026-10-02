@@ -29,6 +29,7 @@ var viewingServices = []viewingService{
 	{ID: "youtube", Name: "YouTube", Icon: serviceIcon("youtube.svg")},
 	{ID: "fandango-at-home", Name: "Fandango at Home", Icon: serviceIcon("fandango-at-home.png")},
 	{ID: "plex", Name: "Plex", Icon: serviceIcon("plex.svg")},
+	{ID: "video-on-demand", Name: "Video on demand (rental)", Icon: serviceIcon("video-on-demand.svg")},
 	{ID: "theaters", Name: "In theaters", Icon: serviceIcon("theaters.svg")},
 }
 
