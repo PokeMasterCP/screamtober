@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/pokemastercp/screamtober/internal/tmdb"
 )
@@ -39,7 +40,7 @@ func TestMovieSearchPage(t *testing.T) {
 	defer db.Close()
 	a, _ := portalFixture(t, db)
 	stub := &searchStub{result: tmdb.SearchResults{Page: 1, Results: []tmdb.MovieSummary{{ID: 948, Title: "<script>alert(1)</script>"}}, TotalPages: 1, TotalResults: 1}}
-	h, err := newHandlerWithMovieSearch(a, db, stub)
+	h, err := newHandlerWithMovieSearch(a, db, stub, time.Now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,7 +99,7 @@ func TestMovieSearchPageSize(t *testing.T) {
 		results = append(results, tmdb.MovieSummary{ID: 1000 + i, Title: fmt.Sprintf("Result %02d", i)})
 	}
 	stub := &searchStub{result: tmdb.SearchResults{Page: 1, Results: results, TotalPages: 1, TotalResults: 20}}
-	h, err := newHandlerWithMovieSearch(a, db, stub)
+	h, err := newHandlerWithMovieSearch(a, db, stub, time.Now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -161,7 +162,7 @@ func TestMovieSearchRequiresAdmin(t *testing.T) {
 	defer db.Close()
 	a, _ := portalFixture(t, db)
 	stub := &searchStub{}
-	h, err := newHandlerWithMovieSearch(a, db, stub)
+	h, err := newHandlerWithMovieSearch(a, db, stub, time.Now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -195,7 +196,7 @@ func TestMovieSearchCompletionLog(t *testing.T) {
 	defer db.Close()
 	a, _ := portalFixture(t, db)
 	stub := &searchStub{result: tmdb.SearchResults{Page: 1, Results: []tmdb.MovieSummary{}}}
-	h, err := newHandlerWithMovieSearch(a, db, stub)
+	h, err := newHandlerWithMovieSearch(a, db, stub, time.Now)
 	if err != nil {
 		t.Fatal(err)
 	}

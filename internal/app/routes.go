@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/pokemastercp/screamtober/internal/tmdb"
 )
@@ -13,11 +14,12 @@ import (
 //go:embed templates/*.html
 var templateFiles embed.FS
 
-func newHandler(auth *auth, db *sql.DB) (http.Handler, error) {
-	return newHandlerWithMovieSearch(auth, db, tmdb.New(os.Getenv("TMDB_API_KEY")))
+// now reports the current time in the household's time zone for calendar dates.
+func newHandler(auth *auth, db *sql.DB, now func() time.Time) (http.Handler, error) {
+	return newHandlerWithMovieSearch(auth, db, tmdb.New(os.Getenv("TMDB_API_KEY")), now)
 }
 
-func newHandlerWithMovieSearch(auth *auth, db *sql.DB, movies movieSearcher) (http.Handler, error) {
+func newHandlerWithMovieSearch(auth *auth, db *sql.DB, movies movieSearcher, now func() time.Time) (http.Handler, error) {
 	pages, err := template.ParseFS(templateFiles, "templates/*.html")
 	if err != nil {
 		return nil, err
@@ -25,7 +27,7 @@ func newHandlerWithMovieSearch(auth *auth, db *sql.DB, movies movieSearcher) (ht
 
 	auth.pages = pages
 	mux := http.NewServeMux()
-	admin := &adminHandler{db: db, queries: newQueries(db), pages: pages}
+	admin := &adminHandler{db: db, queries: newQueries(db), pages: pages, now: now}
 	mux.Handle("GET /admin/calendar", auth.requireAdmin(http.HandlerFunc(admin.calendar)))
 	mux.Handle("POST /admin/calendar", auth.requireAdmin(http.HandlerFunc(admin.saveCalendar)))
 	search := &movieSearchHandler{admin: admin, movies: movies}
@@ -53,7 +55,7 @@ func newHandlerWithMovieSearch(auth *auth, db *sql.DB, movies movieSearcher) (ht
 	mux.HandleFunc("GET /credits", func(w http.ResponseWriter, r *http.Request) {
 		renderPage(w, r, pages, "credits.html", http.StatusOK, nil)
 	})
-	challenges := &challengeHandler{db: db, queries: newQueries(db), auth: auth, pages: pages}
+	challenges := &challengeHandler{db: db, queries: newQueries(db), auth: auth, pages: pages, now: now}
 	mux.HandleFunc("GET /{$}", challenges.home)
 	mux.HandleFunc("GET /challenges/{year}", challenges.byYear)
 	mux.Handle("POST /challenges/{year}/movies/{id}/rating", auth.requireAuth(http.HandlerFunc(challenges.rate)))

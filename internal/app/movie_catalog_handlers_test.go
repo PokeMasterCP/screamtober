@@ -29,7 +29,7 @@ func TestAddMovieFromSearch(t *testing.T) {
 	a, _ := portalFixture(t, db)
 	date, overview := "1978-10-24", "Original overview"
 	stub := &searchStub{result: tmdb.SearchResults{Page: 1, TotalPages: 2, TotalResults: 21, Results: []tmdb.MovieSummary{{ID: 948, Title: "Halloween", ReleaseDate: &date, Overview: &overview}}}}
-	h, err := newHandlerWithMovieSearch(a, db, stub)
+	h, err := newHandlerWithMovieSearch(a, db, stub, time.Now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -294,7 +294,7 @@ func TestAddMovieDatabaseFailureLog(t *testing.T) {
 	db := schemaFixture(t)
 	a, _ := portalFixture(t, db)
 	stub := &searchStub{result: tmdb.SearchResults{Page: 1, TotalPages: 1, Results: []tmdb.MovieSummary{{ID: 456, Title: "New movie"}}}}
-	h, err := newHandlerWithMovieSearch(a, db, stub)
+	h, err := newHandlerWithMovieSearch(a, db, stub, time.Now)
 	if err != nil {
 		t.Fatal(err)
 	}

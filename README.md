@@ -85,6 +85,7 @@ Pass settings with `-e NAME=value` when starting the container.
 | `CLOUDFLARE_TUNNEL` | `false`. Set `true` only for private tunnel ingress; trusts Cloudflare's client IP header but does not create a tunnel. Otherwise, forwarded IP headers are ignored. |
 | `AUTH_INSECURE_COOKIE` | `false`. Set `true` only for local HTTP testing. |
 | `LOG_LEVEL` | `info`; also accepts `debug`, `warn`, or `error`. |
+| `TZ` | `UTC`. The household's IANA time zone, such as `America/New_York`; decides tonight's movie and the current challenge year. |
 
 ## Keep your data
 

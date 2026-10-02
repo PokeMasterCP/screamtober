@@ -80,7 +80,7 @@ Discuss scaling or storage changes before adding instances with independent SQLi
   it. Do not search for or select other database files. Deployment must verify the
   persistent mount.
 - Keep `ADDR`, `DATABASE_DIR`, `CLOUDFLARE_TUNNEL`, `ADMIN_TOKEN`,
-  `AUTH_INSECURE_COOKIE`, and `LOG_LEVEL` configurable at runtime; Docker values
+  `AUTH_INSECURE_COOKIE`, `LOG_LEVEL`, and `TZ` configurable at runtime; Docker values
   are overridable defaults. Supply secrets at runtime and keep them out of source
   control, logs, and public responses. Personal tokens are shown only when issued.
 - Use volume snapshots where available and periodic SQLite-consistent portable

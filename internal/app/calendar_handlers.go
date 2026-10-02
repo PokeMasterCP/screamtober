@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/pokemastercp/screamtober/internal/store"
 )
@@ -33,8 +32,8 @@ func calendarRevision(movies []store.ListChallengeMoviesRow) string {
 	return fmt.Sprintf("%x", hash.Sum(nil))
 }
 
-func calendarYear(w http.ResponseWriter, r *http.Request) (int64, bool) {
-	year, ok := int64(time.Now().Year()), true
+func (h *adminHandler) calendarYear(w http.ResponseWriter, r *http.Request) (int64, bool) {
+	year, ok := int64(h.now().Year()), true
 	if raw := r.URL.Query().Get("year"); raw != "" {
 		year, ok = parseYear(raw)
 	}
@@ -48,7 +47,7 @@ func calendarYear(w http.ResponseWriter, r *http.Request) (int64, bool) {
 }
 
 func (h *adminHandler) calendar(w http.ResponseWriter, r *http.Request) {
-	year, ok := calendarYear(w, r)
+	year, ok := h.calendarYear(w, r)
 	if !ok {
 		return
 	}
@@ -87,7 +86,7 @@ var errCalendarInvalid = errors.New("invalid arrangement")
 
 func (h *adminHandler) saveCalendar(w http.ResponseWriter, r *http.Request) {
 	startEvent(r, "calendar.save")
-	year, ok := calendarYear(w, r)
+	year, ok := h.calendarYear(w, r)
 	if !ok {
 		return
 	}

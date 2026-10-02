@@ -3,7 +3,9 @@ package app
 import (
 	"bytes"
 	"encoding/json"
+	"strings"
 	"testing"
+	"time"
 )
 
 func TestLogger(t *testing.T) {
@@ -23,6 +25,26 @@ func TestLogger(t *testing.T) {
 	}
 	if entry["message"] != "server starting" || entry["level"] != "info" || entry["addr"] != "127.0.0.1:8080" {
 		t.Fatalf("unexpected structured log: %v", entry)
+	}
+}
+
+func TestLoggerTimesUseUTC(t *testing.T) {
+	// TZ sets the process's local zone; log times stay in UTC regardless.
+	local := time.Local
+	time.Local = time.FixedZone("household", -4*60*60)
+	t.Cleanup(func() { time.Local = local })
+	var output bytes.Buffer
+	logger, err := newLogger(&output, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	logger.Info("server starting")
+	var entry map[string]any
+	if err := json.Unmarshal(output.Bytes(), &entry); err != nil {
+		t.Fatal(err)
+	}
+	if value, _ := entry["time"].(string); !strings.HasSuffix(value, "Z") {
+		t.Fatalf("log time %q is not UTC", value)
 	}
 }
 

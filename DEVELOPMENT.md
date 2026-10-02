@@ -87,6 +87,11 @@ queries; keep them free of extra queries and live TMDB requests. Calendar nights
 use `moviePosterThumbURL` for smaller TMDB images. Keep server-side validation, conflict detection, and
 rollback coverage for calendar arrangement.
 
+Calendar dates (tonight, nights left, the October countdown, and default
+challenge years) come from the handlers' `now` clock in the household `TZ`, not
+`time.Now()`. `TZ` defaults to UTC rather than the host zone, and the binary embeds
+zoneinfo because the image has none. Stored timestamps stay UTC.
+
 Unmatched requests, including unsupported methods on known paths, return the
 `not_found.html` page through a catch-all route, so a wrong method is a 404 rather
 than a 405. GET pages with a missing resource, such as an unknown challenge year,
@@ -100,7 +105,7 @@ breaking cross-origin request protection.
 
 ## Logging
 
-Write structured JSON. Each HTTP request produces one `http request` completion
+Write structured JSON with UTC times, whatever `TZ` is. Each HTTP request produces one `http request` completion
 record with request ID, client IP, method, path, matched `route`, status,
 duration, and response size. Handlers add to that record synchronously with the
 helpers in `request_logging.go`; never log a request separately. Independent

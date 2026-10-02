@@ -26,6 +26,9 @@ func newLogger(output io.Writer, levelName string) (*slog.Logger, error) {
 		ReplaceAttr: func(groups []string, attr slog.Attr) slog.Attr {
 			if len(groups) == 0 {
 				switch attr.Key {
+				case slog.TimeKey:
+					// TZ also sets the process's local zone; keep log times in UTC.
+					attr.Value = slog.TimeValue(attr.Value.Time().UTC())
 				case slog.MessageKey:
 					attr.Key = "message"
 				case slog.LevelKey:
