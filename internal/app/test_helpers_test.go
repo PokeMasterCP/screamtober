@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/pokemastercp/screamtober/internal/store"
 )
@@ -42,7 +43,7 @@ func portalFixture(t *testing.T, db *sql.DB) (*auth, http.Handler) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h, err := newHandler(a, db)
+	h, err := newHandler(a, db, time.Now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -148,7 +149,7 @@ func challengeHTTPFixture(t *testing.T, db *sql.DB) http.Handler {
 		t.Fatal(err)
 	}
 	setTestUserToken(t, db, 2, testToken)
-	h, err := newHandler(a, db)
+	h, err := newHandler(a, db, time.Now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -220,7 +221,7 @@ func execSchema(t *testing.T, db *sql.DB, query string, args ...any) {
 
 func authRoutes(t *testing.T, a *auth, db *sql.DB) http.Handler {
 	t.Helper()
-	h, err := newHandler(a, db)
+	h, err := newHandler(a, db, time.Now)
 	if err != nil {
 		t.Fatal(err)
 	}

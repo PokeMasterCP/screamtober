@@ -7,6 +7,7 @@ import (
 	"html/template"
 	"net/http"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/pokemastercp/screamtober/internal/store"
@@ -18,6 +19,7 @@ type adminHandler struct {
 	db      *sql.DB
 	queries *store.Queries
 	pages   *template.Template
+	now     func() time.Time
 }
 
 type adminUsersPage struct {

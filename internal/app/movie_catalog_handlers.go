@@ -6,12 +6,11 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"time"
 )
 
 func (h *movieSearchHandler) add(w http.ResponseWriter, r *http.Request) {
 	startEvent(r, "movie.add")
-	data := movieSearchPage{Year: time.Now().Year()}
+	data := movieSearchPage{Year: h.admin.now().Year()}
 	reject := func(status int, message, reason string) {
 		data.Error = message
 		eventRejected(r, reason)

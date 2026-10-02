@@ -24,6 +24,11 @@ func Run() int {
 		logger.Error("invalid deployment configuration", "error", err)
 		return 1
 	}
+	location, err := loadTimezone(os.Getenv("TZ"))
+	if err != nil {
+		logger.Error("invalid time zone configuration", "error", err)
+		return 1
+	}
 	insecureCookie := false
 	if value := os.Getenv("AUTH_INSECURE_COOKIE"); value != "" {
 		insecureCookie, err = strconv.ParseBool(value)
@@ -53,7 +58,7 @@ func Run() int {
 		logger.Error("invalid authentication configuration", "error", err)
 		return 1
 	}
-	handler, err := newHandler(auth, db)
+	handler, err := newHandler(auth, db, householdClock(location))
 	if err != nil {
 		logger.Error("load templates", "error", err)
 		return 1
@@ -73,7 +78,7 @@ func Run() int {
 	}
 	// Report settings, never secrets. tmdb.New trims the key the same way.
 	logger.Info("starting server", "addr", addr, "cloudflare_tunnel", tunnel, "insecure_cookie", insecureCookie,
-		"tmdb_configured", strings.TrimSpace(os.Getenv("TMDB_API_KEY")) != "")
+		"timezone", location.String(), "tmdb_configured", strings.TrimSpace(os.Getenv("TMDB_API_KEY")) != "")
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		logger.Error("server stopped", "error", err)
 		return 1

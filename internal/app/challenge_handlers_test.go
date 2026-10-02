@@ -383,3 +383,57 @@ func TestChallengeCalendarDates(t *testing.T) {
 		t.Errorf("night label = %q", got)
 	}
 }
+
+func TestHomeUsesHouseholdTimezone(t *testing.T) {
+	newYork, err := loadTimezone("America/New_York")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Each instant falls on a different calendar date in UTC than in New York.
+	october := time.Date(2026, time.October, 2, 1, 0, 0, 0, time.UTC)
+	newYear := time.Date(2027, time.January, 1, 1, 0, 0, 0, time.UTC)
+	for _, tt := range []struct {
+		name     string
+		instant  time.Time
+		location *time.Location
+		want     []string
+	}{
+		{"evening in New York", october, newYork, []string{`<span class="kicker-live">Up next</span>`, `<b>31</b><span>of 31</span>`, `Thu: Test movie, watched, tonight`}},
+		{"next day in UTC", october, time.UTC, []string{`<span class="kicker-live">Tonight</span>`, `<b>30</b><span>of 31</span>`, `Fri: Test movie, tonight`}},
+		{"new year's eve in New York", newYear, newYork, []string{"2026 movie challenge"}},
+		{"new year's day in UTC", newYear, time.UTC, []string{"2027 movie challenge"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			db := schemaFixture(t)
+			execSchema(t, db, `UPDATE challenge_movies SET watched_at = CURRENT_TIMESTAMP WHERE id = 1`)
+			a, err := newAuth(testAdminToken, true, db)
+			if err != nil {
+				t.Fatal(err)
+			}
+			h, err := newHandler(a, db, func() time.Time { return tt.instant.In(tt.location) })
+			if err != nil {
+				t.Fatal(err)
+			}
+			w := authRequest(h, "GET", "/", "", nil)
+			for _, want := range tt.want {
+				if w.Code != 200 || !strings.Contains(w.Body.String(), want) {
+					t.Fatalf("home missing %q: %d", want, w.Code)
+				}
+			}
+		})
+	}
+}
+
+func TestLoadTimezone(t *testing.T) {
+	for name, want := range map[string]string{"": "UTC", "UTC": "UTC", "America/New_York": "America/New_York"} {
+		location, err := loadTimezone(name)
+		if err != nil || location.String() != want {
+			t.Errorf("loadTimezone(%q) = %v, %v; want %s", name, location, err, want)
+		}
+	}
+	for _, name := range []string{"Local", "Mars/Olympus", "-0400", "America/New_York "} {
+		if _, err := loadTimezone(name); err == nil {
+			t.Errorf("loadTimezone(%q) accepted", name)
+		}
+	}
+}

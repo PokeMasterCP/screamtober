@@ -18,6 +18,7 @@ type challengeHandler struct {
 	queries *store.Queries
 	auth    *auth
 	pages   *template.Template
+	now     func() time.Time
 }
 
 type challengePage struct {
@@ -74,8 +75,9 @@ func (h *challengeHandler) home(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var selected *store.Challenge
+	year := int64(h.now().Year())
 	for i := range challenges {
-		if challenges[i].Year == int64(time.Now().Year()) {
+		if challenges[i].Year == year {
 			selected = &challenges[i]
 			break
 		}
@@ -116,7 +118,7 @@ func (h *challengeHandler) render(w http.ResponseWriter, r *http.Request, challe
 		h.fail(w, r, "check user session", err)
 		return
 	}
-	now := time.Now()
+	now := h.now()
 	data := challengePage{Title: "Screamtober", SignedIn: user != nil, User: user, Challenges: challenges, Challenge: selected}
 	data.Year = int64(now.Year())
 	data.DaysUntil = daysUntilOctober(now)

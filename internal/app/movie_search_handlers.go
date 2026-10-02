@@ -61,7 +61,7 @@ func (m adminMovie) Service() viewingService { return findViewingService(m.Viewi
 
 func (h *movieSearchHandler) search(w http.ResponseWriter, r *http.Request) {
 	data := movieSearchPage{Query: strings.TrimSpace(r.URL.Query().Get("q"))}
-	data.Year = time.Now().Year()
+	data.Year = h.admin.now().Year()
 	if raw := r.URL.Query().Get("year"); raw != "" {
 		year, ok := parseYear(raw)
 		if ok {

@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/pokemastercp/screamtober/internal/store"
 	"github.com/pokemastercp/screamtober/internal/tmdb"
@@ -58,7 +59,7 @@ func TestViewingServiceFormAndPublicDisplay(t *testing.T) {
 	db := schemaFixture(t)
 	a, _ := portalFixture(t, db)
 	stub := &searchStub{result: tmdb.SearchResults{Page: 1, TotalPages: 1, Results: []tmdb.MovieSummary{{ID: 321, Title: "Service pick"}}}}
-	h, err := newHandlerWithMovieSearch(a, db, stub)
+	h, err := newHandlerWithMovieSearch(a, db, stub, time.Now)
 	if err != nil {
 		t.Fatal(err)
 	}
