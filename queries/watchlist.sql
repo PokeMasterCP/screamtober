@@ -43,3 +43,18 @@ WHERE id = sqlc.arg(id) AND challenge_id = sqlc.arg(challenge_id);
 UPDATE challenge_movies
 SET watched_at = CURRENT_TIMESTAMP
 WHERE id = sqlc.arg(id) AND challenge_id = sqlc.arg(challenge_id) AND watched_at IS NULL;
+
+-- name: ChallengeMovieExists :one
+SELECT EXISTS (
+    SELECT 1 FROM challenge_movies WHERE id = sqlc.arg(id) AND challenge_id = sqlc.arg(challenge_id)
+);
+
+-- Saving a rating is the only way to mark an entry watched, so removing its last
+-- rating restores it to unwatched. Affects one row only when that happens.
+-- name: ClearUnratedChallengeMovieWatched :execrows
+UPDATE challenge_movies
+SET watched_at = NULL
+WHERE challenge_movies.id = sqlc.arg(id)
+  AND challenge_movies.challenge_id = sqlc.arg(challenge_id)
+  AND challenge_movies.watched_at IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM ratings WHERE ratings.challenge_movie_id = challenge_movies.id);

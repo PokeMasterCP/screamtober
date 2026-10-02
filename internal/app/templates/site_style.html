@@ -511,10 +511,24 @@
     .star-options:has(label:nth-of-type(4):hover) label:nth-of-type(-n+4),
     .star-options:has(label:nth-of-type(5):hover) label:nth-of-type(-n+5) { color: var(--ink) !important; }
   }
+  .rating-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
   .rating-form button { flex: 0 0 auto; min-height: 42px; padding: .5rem 1.1rem; }
+  .rating-note { flex-basis: 100%; margin: 0; color: var(--muted); font-size: .78rem; line-height: 1.4; }
   .movie-card .rating-form { flex-direction: column; align-items: stretch; }
   .movie-card .star-picker { flex: 0 0 auto; }
+  .movie-card .rating-actions { flex-direction: column; }
   .movie-card .rating-form button { width: 100%; }
+  /* Lineup cards keep the household verdict visible and tuck the picker away.
+     The open picker rises over the card from its toggle, so opening one never
+     resizes the other cards in the row. */
+  .rate-panel { position: relative; margin-top: .6rem; border-top: 1px solid var(--line); }
+  .rate-panel > summary { width: 100%; min-height: 40px; padding: .45rem 0 0; font-size: .84rem; color: var(--muted); }
+  .rate-panel > summary::before { transform: rotate(-135deg); margin-top: .2rem; }
+  .rate-panel[open] > summary::before { transform: rotate(45deg); margin-top: -.2rem; }
+  .rate-panel > summary:hover, .rate-panel[open] > summary { color: var(--ink); }
+  .rate-panel.is-due > summary { color: var(--blood-2); }
+  .rate-panel .rating-form { position: absolute; left: -.35rem; right: -.35rem; bottom: calc(100% + .35rem); z-index: 2; gap: .5rem; margin: 0; padding: .7rem .75rem .8rem; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--surface-2); box-shadow: 0 -18px 36px -18px rgba(0, 0, 0, .95); }
+  .rate-panel .star-picker legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; padding: 0; }
   .movie-card .star-options label { font-size: 1.45rem; }
 
   /* ---------- Empty states ---------- */
@@ -611,7 +625,7 @@
     body::before, body::after { display: none; }
     body { font-size: 10pt; }
     main { max-width: none; padding: 0; }
-    .topbar, .hero, .year-nav, .calendar, .critics, .stats, .site-footer, .skip-link, .rating-form, .movie-poster, .feature-poster-wrap, .carousel-navigation { display: none; }
+    .topbar, .hero, .year-nav, .calendar, .critics, .stats, .site-footer, .skip-link, .rating-form, .rate-panel, .movie-poster, .feature-poster-wrap, .carousel-navigation { display: none; }
     .programme-layout { display: block; margin: 0; }
     .feature-layout { display: block; }
     .feature-title { font-size: 2rem; }

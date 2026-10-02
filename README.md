@@ -68,8 +68,9 @@ calendar, and create one owner profile and up to three members. Copy each person
 login token when issued and share it privately; it is shown only once.
 
 Sign out of admin, then sign in with your personal token to rate movies. Saving a
-rating marks the movie watched for the household. Admin access manages the app;
-personal access is for ratings. There is no public registration.
+rating marks the movie watched for the household. You can change or remove your
+own ratings; removing a movie's only rating marks it unwatched again. Admin access
+manages the app; personal access is for ratings. There is no public registration.
 
 ## Settings
 
