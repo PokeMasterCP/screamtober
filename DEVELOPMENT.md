@@ -62,7 +62,8 @@ prevent duplicate POST retries while allowing intentional repeats.
 
 Use `withTransaction` for atomic changes. Rating saves and marking an entry watched
 commit together, preserving its first watched time without backfilling history at
-startup. Calendar reordering clears and assigns positions in one transaction,
+startup. Removing an entry's last rating clears its watched time in the same
+transaction, since ratings are the only record of a watch. Calendar reordering clears and assigns positions in one transaction,
 retaining entry IDs. Scope writes to the requested challenge and entry.
 
 ## Sessions
@@ -77,8 +78,10 @@ least recently used one. Admin sessions stay in memory.
 ## Pages
 
 Use `site_style.html`, the buffered `renderPage` helper, and `movie_ratings.html`
-for shared rating controls and verdicts. Poster-only carousel cards must retain
-accessible movie names. Home page summaries (month calendar, countdown, critics,
+for shared rating controls and verdicts. The featured movie shows its star picker
+inline; lineup cards tuck theirs into a `rate-panel` disclosure that opens over the
+card without resizing the row and works without JavaScript. Poster-only carousel
+cards must retain accessible movie names. Home page summaries (month calendar, countdown, critics,
 top pick, unrated reminders) derive from the challenge's existing movie and rating
 queries; keep them free of extra queries and live TMDB requests. Calendar nights
 use `moviePosterThumbURL` for smaller TMDB images. Keep server-side validation, conflict detection, and

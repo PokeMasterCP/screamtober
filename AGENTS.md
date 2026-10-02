@@ -9,7 +9,7 @@ catalog grows. Watchlists may be incomplete and may repeat movies.
 | Session | Permissions |
 | --- | --- |
 | Visitor | View public challenge data only |
-| Personal (owner or member) | View challenges and submit or edit their own ratings |
+| Personal (owner or member) | View challenges and submit, edit, or remove their own ratings |
 | Admin | Manage movies, arrangements, and household access; no personal ratings |
 
 - Enforce permissions on every relevant backend request. Public access excludes
@@ -17,6 +17,7 @@ catalog grows. Watchlists may be incomplete and may repeat movies.
 - Ratings are whole stars from 1–5, tied to each challenge entry. Average only
   submitted ratings. Saving a rating must atomically mark that entry watched for
   the household, preserving its first watched timestamp on subsequent saves.
+  Removing an entry's last rating atomically marks it unwatched.
 - The admin provisions one owner and up to three members with random personal
   tokens distributed privately. There is no public registration. The owner label
   grants no administrative privileges through a personal session.

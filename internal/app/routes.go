@@ -57,6 +57,7 @@ func newHandlerWithMovieSearch(auth *auth, db *sql.DB, movies movieSearcher) (ht
 	mux.HandleFunc("GET /{$}", challenges.home)
 	mux.HandleFunc("GET /challenges/{year}", challenges.byYear)
 	mux.Handle("POST /challenges/{year}/movies/{id}/rating", auth.requireAuth(http.HandlerFunc(challenges.rate)))
+	mux.Handle("POST /challenges/{year}/movies/{id}/rating/delete", auth.requireAuth(http.HandlerFunc(challenges.removeRating)))
 	// Unmatched requests, including unsupported methods on known paths, get the
 	// 404 page. Logging omits the route for this catch-all pattern.
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

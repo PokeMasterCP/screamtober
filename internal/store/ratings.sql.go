@@ -9,6 +9,31 @@ import (
 	"context"
 )
 
+const deleteRating = `-- name: DeleteRating :execrows
+DELETE FROM ratings
+WHERE ratings.user_id = ?1
+  AND ratings.challenge_movie_id = (
+      SELECT cm.id FROM challenge_movies AS cm
+      WHERE cm.id = ?2 AND cm.challenge_id = ?3
+  )
+`
+
+type DeleteRatingParams struct {
+	UserID           int64
+	ChallengeMovieID int64
+	ChallengeID      int64
+}
+
+// The caller must derive user_id from the authenticated user, not form input.
+// A mismatched entry/challenge deletes nothing.
+func (q *Queries) DeleteRating(ctx context.Context, arg DeleteRatingParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteRating, arg.UserID, arg.ChallengeMovieID, arg.ChallengeID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const listChallengeRatings = `-- name: ListChallengeRatings :many
 SELECT r.id, r.user_id, r.challenge_movie_id, r.score, r.updated_at,
        u.display_name

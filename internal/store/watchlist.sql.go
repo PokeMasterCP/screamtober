@@ -43,6 +43,24 @@ func (q *Queries) AddUnscheduledMovie(ctx context.Context, arg AddUnscheduledMov
 	return i, err
 }
 
+const challengeMovieExists = `-- name: ChallengeMovieExists :one
+SELECT EXISTS (
+    SELECT 1 FROM challenge_movies WHERE id = ?1 AND challenge_id = ?2
+)
+`
+
+type ChallengeMovieExistsParams struct {
+	ID          int64
+	ChallengeID int64
+}
+
+func (q *Queries) ChallengeMovieExists(ctx context.Context, arg ChallengeMovieExistsParams) (bool, error) {
+	row := q.db.QueryRowContext(ctx, challengeMovieExists, arg.ID, arg.ChallengeID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const clearChallengePositions = `-- name: ClearChallengePositions :exec
 UPDATE challenge_movies SET position = NULL WHERE challenge_id = ?
 `
@@ -50,6 +68,30 @@ UPDATE challenge_movies SET position = NULL WHERE challenge_id = ?
 func (q *Queries) ClearChallengePositions(ctx context.Context, challengeID int64) error {
 	_, err := q.db.ExecContext(ctx, clearChallengePositions, challengeID)
 	return err
+}
+
+const clearUnratedChallengeMovieWatched = `-- name: ClearUnratedChallengeMovieWatched :execrows
+UPDATE challenge_movies
+SET watched_at = NULL
+WHERE challenge_movies.id = ?1
+  AND challenge_movies.challenge_id = ?2
+  AND challenge_movies.watched_at IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM ratings WHERE ratings.challenge_movie_id = challenge_movies.id)
+`
+
+type ClearUnratedChallengeMovieWatchedParams struct {
+	ID          int64
+	ChallengeID int64
+}
+
+// Saving a rating is the only way to mark an entry watched, so removing its last
+// rating restores it to unwatched. Affects one row only when that happens.
+func (q *Queries) ClearUnratedChallengeMovieWatched(ctx context.Context, arg ClearUnratedChallengeMovieWatchedParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, clearUnratedChallengeMovieWatched, arg.ID, arg.ChallengeID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const countChallengeMovies = `-- name: CountChallengeMovies :one

@@ -4,6 +4,17 @@
 <ul class="ratings" aria-label="Individual ratings">{{range .Movie.Ratings}}<li><span class="visually-hidden">{{.DisplayName}}: {{.Score}} / 5</span><span class="rater" aria-hidden="true">{{.DisplayName}}</span>{{template "star_row" .}}</li>{{end}}</ul>
 {{else}}<p class="rating muted">{{if .Featured}}Nobody has rated this one yet.{{if not .SignedIn}} <a href="/login">Sign in</a> to be the first.{{end}}{{else}}No ratings yet.{{end}}</p>{{end}}
 {{if .SignedIn}}
+{{if .Featured}}{{template "rating_form" .}}
+{{else}}
+<details class="rate-panel{{if and .Movie.WatchedAt.Valid (not .Movie.YourRating)}} is-due{{end}}">
+ <summary>{{if .Movie.YourRating}}Edit your rating{{else}}Rate this movie{{end}}</summary>
+ {{template "rating_form" .}}
+</details>
+{{end}}
+{{end}}
+{{end}}
+
+{{define "rating_form"}}
 <form class="rating-form" method="post" action="/challenges/{{.Year}}/movies/{{.Movie.ID}}/rating">
  <fieldset class="star-picker">
   <legend>Your rating</legend>
@@ -11,7 +22,10 @@
    {{range .Scores}}<input type="radio" id="rating-{{$.Movie.ID}}-{{.}}" name="score" value="{{.}}"{{if eq $.Movie.YourRating .}} checked{{end}} required><label for="rating-{{$.Movie.ID}}-{{.}}"><span class="visually-hidden">{{.}} {{if eq . 1}}star{{else}}stars{{end}}</span></label>{{end}}
   </div>
  </fieldset>
- <button type="submit">{{if .Movie.YourRating}}Update rating{{else}}Save rating{{end}}</button>
+ <div class="rating-actions">
+  <button type="submit">{{if .Movie.YourRating}}Update rating{{else}}Save rating{{end}}</button>
+  {{if .Movie.YourRating}}<button class="secondary danger" type="submit" formaction="/challenges/{{.Year}}/movies/{{.Movie.ID}}/rating/delete" formnovalidate>Remove rating</button>{{end}}
+ </div>
+ {{if and .Movie.YourRating (eq (len .Movie.Ratings) 1)}}<p class="rating-note">Yours is the only rating, so removing it also marks this movie unwatched.</p>{{end}}
 </form>
-{{end}}
 {{end}}

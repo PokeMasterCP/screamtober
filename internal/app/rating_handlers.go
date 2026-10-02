@@ -66,3 +66,58 @@ func (h *challengeHandler) rate(w http.ResponseWriter, r *http.Request) {
 	eventSucceeded(r, "first_watch", firstWatch)
 	http.Redirect(w, r, fmt.Sprintf("/challenges/%d#movie-%d", year, id), http.StatusSeeOther)
 }
+
+// removeRating deletes the person's own rating. Removing an entry's last rating
+// also clears its watched time, so an accidental rating can be fully undone.
+func (h *challengeHandler) removeRating(w http.ResponseWriter, r *http.Request) {
+	startEvent(r, "rating.delete")
+	user := r.Context().Value(authenticatedUserKey{}).(store.User)
+	year, id, ok := challengeMovieIDs(w, r)
+	if !ok {
+		return
+	}
+	fail := func(step string, err error) {
+		eventFailed(r, step, err)
+		http.Error(w, "Unable to remove rating. Please try again later.", http.StatusInternalServerError)
+	}
+	challenge, err := h.queries.GetChallengeByYear(r.Context(), year)
+	if errors.Is(err, sql.ErrNoRows) {
+		eventRejected(r, "not_found")
+		http.NotFound(w, r)
+		return
+	}
+	if err != nil {
+		fail("get challenge", err)
+		return
+	}
+	var removed, unwatched bool
+	err = withTransaction(r.Context(), h.db, func(q *store.Queries) error {
+		deleted, err := q.DeleteRating(r.Context(), store.DeleteRatingParams{UserID: user.ID, ChallengeMovieID: id, ChallengeID: challenge.ID})
+		if err != nil {
+			return err
+		}
+		if deleted == 0 {
+			// Repeated submissions are harmless once the rating is gone.
+			exists, err := q.ChallengeMovieExists(r.Context(), store.ChallengeMovieExistsParams{ID: id, ChallengeID: challenge.ID})
+			if err == nil && !exists {
+				err = sql.ErrNoRows
+			}
+			return err
+		}
+		removed = true
+		cleared, err := q.ClearUnratedChallengeMovieWatched(r.Context(), store.ClearUnratedChallengeMovieWatchedParams{ID: id, ChallengeID: challenge.ID})
+		unwatched = cleared == 1
+		return err
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		eventRejected(r, "not_found")
+		http.NotFound(w, r)
+		return
+	}
+	if err != nil {
+		fail("remove rating", err)
+		return
+	}
+	eventSucceeded(r, "removed", removed, "unwatched", unwatched)
+	http.Redirect(w, r, fmt.Sprintf("/challenges/%d#movie-%d", year, id), http.StatusSeeOther)
+}

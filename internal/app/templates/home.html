@@ -155,6 +155,30 @@ document.querySelectorAll('.movie-poster img, .nights img, .top-pick img, .wrap-
   if (img.complete && !img.naturalWidth) img.remove();
 });
 
+// Card rating panels behave like popovers: one open at a time, closed by
+// Escape or a click elsewhere. Reminders to rate open that card's panel.
+const ratePanels = document.querySelectorAll('.rate-panel');
+ratePanels.forEach(panel => panel.addEventListener('toggle', () => {
+  if (panel.open) ratePanels.forEach(other => { if (other !== panel) other.open = false; });
+}));
+document.addEventListener('click', event => {
+  ratePanels.forEach(panel => { if (panel.open && !panel.contains(event.target)) panel.open = false; });
+});
+document.addEventListener('keydown', event => {
+  const panel = event.key === 'Escape' && event.target.closest && event.target.closest('.rate-panel[open]');
+  if (panel) {
+    panel.open = false;
+    panel.querySelector('summary').focus();
+  }
+});
+document.querySelectorAll('.to-rate a').forEach(link => link.addEventListener('click', event => {
+  const panel = document.querySelector(`${link.hash} .rate-panel`);
+  if (panel) {
+    event.stopPropagation();
+    panel.open = true;
+  }
+}));
+
 const carousel = document.getElementById('challenge-carousel');
 if (carousel) {
   const items = Array.from(carousel.children);

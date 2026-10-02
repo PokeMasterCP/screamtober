@@ -18,3 +18,13 @@ JOIN challenge_movies AS cm ON cm.id = r.challenge_movie_id
 JOIN users AS u ON u.id = r.user_id
 WHERE cm.challenge_id = ?
 ORDER BY cm.position, r.user_id;
+
+-- The caller must derive user_id from the authenticated user, not form input.
+-- A mismatched entry/challenge deletes nothing.
+-- name: DeleteRating :execrows
+DELETE FROM ratings
+WHERE ratings.user_id = sqlc.arg(user_id)
+  AND ratings.challenge_movie_id = (
+      SELECT cm.id FROM challenge_movies AS cm
+      WHERE cm.id = sqlc.arg(challenge_movie_id) AND cm.challenge_id = sqlc.arg(challenge_id)
+  );
