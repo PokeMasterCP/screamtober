@@ -22,8 +22,8 @@ func TestChallengePages(t *testing.T) {
 		status   int
 		contains []string
 	}{
-		{"/challenges/2027", 200, []string{"2027 movie challenge", "1 of 31 movies selected · 0 watched", "Household rating: 3.0 / 5 (1 rating)"}},
-		{"/challenges/2026", 200, []string{"2026 movie challenge", "2 of 31 movies selected · 1 watched", "Household rating: 3.0 / 5 (2 ratings)", "Household rating: 2.0 / 5 (1 rating)", "Owner: 1 / 5", "Member: 5 / 5"}},
+		{"/challenges/2027", 200, []string{"2027 movie challenge", "1 of 31 movies selected · 0 watched", "Household rating: 3.0 / 10 (1 rating)"}},
+		{"/challenges/2026", 200, []string{"2026 movie challenge", "2 of 31 movies selected · 1 watched", "Household rating: 3.0 / 10 (2 ratings)", "Household rating: 2.0 / 10 (1 rating)", "Owner: 1 / 10", "Member: 5 / 10"}},
 		{"/challenges/2025", 404, nil},
 		{"/challenges/nonsense", 404, nil},
 		{"/challenges/999999999999999999999", 404, nil},
@@ -47,10 +47,10 @@ func TestChallengePages(t *testing.T) {
 		})
 	}
 	// A request sees current database values, without requiring a server restart.
-	execSchema(t, db, `UPDATE ratings SET score = 5 WHERE challenge_movie_id = 3`)
+	execSchema(t, db, `UPDATE ratings SET score = 10 WHERE challenge_movie_id = 3`)
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/challenges/2027", nil))
-	if !strings.Contains(w.Body.String(), "Household rating: 5.0 / 5") || strings.Contains(w.Body.String(), "Owner: 1 / 5") {
+	if !strings.Contains(w.Body.String(), "Household rating: 10.0 / 10") || strings.Contains(w.Body.String(), "Owner: 1 / 10") {
 		t.Fatal("page has stale data or includes ratings from another year")
 	}
 }
@@ -345,7 +345,7 @@ func TestChallengeHouseholdSummary(t *testing.T) {
 	for _, cookie := range []*http.Cookie{nil, loginCookie(t, h)} {
 		body := authRequest(h, "GET", "/challenges/2026", "", cookie).Body.String()
 		// Year totals average only submitted ratings; 2027 votes stay out of 2026.
-		for _, want := range []string{`<b>3.0</b><span>★ · 2 ratings`, `class="top-pick" href="#movie-1"`, `Member</span><span class="critic-stats">1 rated · <b>5.0</b>`, `Owner</span><span class="critic-stats">1 rated · <b>1.0</b>`} {
+		for _, want := range []string{`<b>3.0</b><span>/ 10 · 2 ratings`, `class="top-pick" href="#movie-1"`, `Member</span><span class="critic-stats">1 rated · <b>5.0</b>`, `Owner</span><span class="critic-stats">1 rated · <b>1.0</b>`} {
 			if !strings.Contains(body, want) {
 				t.Fatalf("summary missing %q", want)
 			}

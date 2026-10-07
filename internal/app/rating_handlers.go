@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/pokemastercp/screamtober/internal/store"
 )
@@ -19,13 +20,13 @@ func (h *challengeHandler) rate(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 4096)
 	if err := r.ParseForm(); err != nil {
 		eventRejected(r, "invalid_form")
-		http.Error(w, "Unable to read rating. Return to the movie and choose 1–5 stars.", http.StatusBadRequest)
+		http.Error(w, "Unable to read rating. Return to the movie and choose a score from 1 to 10.", http.StatusBadRequest)
 		return
 	}
-	values := r.PostForm["score"]
-	if len(values) != 1 || len(values[0]) != 1 || values[0][0] < '1' || values[0][0] > '5' {
+	score, ok := parseScore(r.PostForm["score"])
+	if !ok {
 		eventRejected(r, "invalid_score")
-		http.Error(w, "Choose a whole-star rating from 1 to 5. Return to the movie to try again.", http.StatusBadRequest)
+		http.Error(w, "Choose a whole-number rating from 1 to 10. Return to the movie to try again.", http.StatusBadRequest)
 		return
 	}
 	fail := func(step string, err error) {
@@ -46,7 +47,7 @@ func (h *challengeHandler) rate(w http.ResponseWriter, r *http.Request) {
 	err = withTransaction(r.Context(), h.db, func(q *store.Queries) error {
 		// Returns sql.ErrNoRows unless the entry belongs to this year.
 		if _, err := q.UpsertRating(r.Context(), store.UpsertRatingParams{
-			UserID: user.ID, Score: int64(values[0][0] - '0'), ChallengeMovieID: id, ChallengeID: challenge.ID,
+			UserID: user.ID, Score: score, ChallengeMovieID: id, ChallengeID: challenge.ID,
 		}); err != nil {
 			return err
 		}
@@ -65,6 +66,21 @@ func (h *challengeHandler) rate(w http.ResponseWriter, r *http.Request) {
 	}
 	eventSucceeded(r, "first_watch", firstWatch)
 	http.Redirect(w, r, fmt.Sprintf("/challenges/%d#movie-%d", year, id), http.StatusSeeOther)
+}
+
+// maxScore is the top of the whole-number rating scale, which starts at 1.
+const maxScore = 10
+
+// parseScore accepts exactly one score written in canonical form, such as "7".
+func parseScore(values []string) (int64, bool) {
+	if len(values) != 1 {
+		return 0, false
+	}
+	score, err := strconv.ParseInt(values[0], 10, 64)
+	if err != nil || score < 1 || score > maxScore || strconv.FormatInt(score, 10) != values[0] {
+		return 0, false
+	}
+	return score, true
 }
 
 // removeRating deletes the person's own rating. Removing an entry's last rating

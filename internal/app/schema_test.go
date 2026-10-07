@@ -21,7 +21,7 @@ func TestSchemaConstraints(t *testing.T) {
 		{"slot 32", `INSERT INTO challenge_movies (challenge_id, movie_id, position) VALUES (1, 1, 32)`},
 		{"fractional slot", `INSERT INTO challenge_movies (challenge_id, movie_id, position) VALUES (1, 1, 2.5)`},
 		{"rating zero", `UPDATE ratings SET score = 0 WHERE user_id = 2`},
-		{"rating six", `UPDATE ratings SET score = 6 WHERE user_id = 2`},
+		{"rating eleven", `UPDATE ratings SET score = 11 WHERE user_id = 2`},
 		{"fractional stars", `UPDATE ratings SET score = 3.5 WHERE user_id = 2`},
 		{"missing score", `UPDATE ratings SET score = NULL WHERE user_id = 2`},
 		{"duplicate rating", `INSERT INTO ratings (user_id, challenge_movie_id, score) VALUES (2, 1, 4)`},

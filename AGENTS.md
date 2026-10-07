@@ -14,7 +14,7 @@ catalog grows. Watchlists may be incomplete and may repeat movies.
 
 - Enforce permissions on every relevant backend request. Public access excludes
   credentials, sessions, and account management; visitors cannot change data.
-- Ratings are whole stars from 1–5, tied to each challenge entry. Average only
+- Ratings are whole numbers from 1–10, tied to each challenge entry. Average only
   submitted ratings. Saving a rating must atomically mark that entry watched for
   the household, preserving its first watched timestamp on subsequent saves.
   Removing an entry's last rating atomically marks it unwatched.

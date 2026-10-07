@@ -115,7 +115,7 @@ func TestRequestEventRejections(t *testing.T) {
 			map[string]any{"reason": "invalid_path", "route": "GET /challenges/{year}"}},
 		{"admin product page", "GET", "/", "", admin, 303, "info", map[string]any{"reason": "admin_session_active", "auth": "admin", "route": nil}},
 		{"cross-site form", "POST", "/logout", "", nil, 403, "warn", map[string]any{"reason": "cross_origin"}},
-		{"invalid score", "POST", "/challenges/2026/movies/1/rating", "score=6", personal, 400, "warn",
+		{"invalid score", "POST", "/challenges/2026/movies/1/rating", "score=11", personal, 400, "warn",
 			map[string]any{"event": "rating.save", "reason": "invalid_score", "auth": "personal", "user_id": float64(2), "year": float64(2026), "entry_id": float64(1)}},
 		{"missing entry", "POST", "/challenges/2026/movies/99/rating", "score=4", personal, 404, "warn",
 			map[string]any{"event": "rating.save", "reason": "not_found", "entry_id": float64(99)}},
