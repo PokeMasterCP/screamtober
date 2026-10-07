@@ -17,7 +17,7 @@ func TestDatabasePersistenceAndMigrations(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if schema.version != 3 || fmt.Sprint(schema.applied) != "[1 2 3]" {
+	if schema.version != 4 || fmt.Sprint(schema.applied) != "[1 2 3 4]" {
 		t.Fatalf("fresh schema = %+v", schema)
 	}
 	t.Cleanup(func() { db.Close() })
@@ -48,7 +48,7 @@ func TestDatabasePersistenceAndMigrations(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if schema.version != 3 || schema.applied == nil || len(schema.applied) != 0 {
+	if schema.version != 4 || schema.applied == nil || len(schema.applied) != 0 {
 		t.Fatalf("reopened schema = %+v", schema)
 	}
 	var value string
@@ -56,7 +56,7 @@ func TestDatabasePersistenceAndMigrations(t *testing.T) {
 		t.Fatalf("persisted value = %q, error = %v", value, err)
 	}
 	var version int
-	if err := db.QueryRowContext(ctx, "SELECT MAX(version_id) FROM goose_db_version WHERE is_applied = 1").Scan(&version); err != nil || version != 3 {
+	if err := db.QueryRowContext(ctx, "SELECT MAX(version_id) FROM goose_db_version WHERE is_applied = 1").Scan(&version); err != nil || version != 4 {
 		t.Fatalf("migration version = %d, error = %v", version, err)
 	}
 }

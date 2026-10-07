@@ -15,7 +15,7 @@
   /* ---------- Design tokens: the midnight programme ----------
      A repertory cinema's printed October calendar: bone ink on warm black,
      hairline rules, oversized condensed numerals and one blood-red accent
-     reserved for status — tonight, seen, stars and focus. */
+     reserved for status — tonight, seen, ratings and focus. */
   :root {
     color-scheme: dark;
     --bg: #0c0a09;
@@ -328,7 +328,7 @@
   .fact { display: flex; flex-direction: column; line-height: 1.25; font-size: .95rem; }
   .fact small, .viewing-service small { display: block; color: var(--muted); font: 600 .64rem/1.5 var(--body); letter-spacing: .18em; text-transform: uppercase; }
   .feature-overview { color: var(--ink-2); font-size: 1.08rem; line-height: 1.65; max-width: 42rem; margin: 0; }
-  .feature-rating { max-width: 34rem; }
+  .feature-rating { max-width: 34rem; container: verdict / inline-size; }
   .feature-rating .label { margin-bottom: .35rem; }
   .feature.is-done { text-align: center; padding-left: 0; padding-right: 0; }
   .feature.is-done .kicker { justify-content: center; }
@@ -485,37 +485,40 @@
   .ratings li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .1rem .75rem; padding: .28rem 0; }
   .ratings li + li { border-top: 1px dashed var(--line); }
   .rater { color: var(--ink-2); font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .stars { letter-spacing: .06em; white-space: nowrap; font-size: .9rem; line-height: 1; }
-  .stars .on { color: var(--blood-2); }
-  .stars .off { color: var(--line-strong); }
+  /* Each person's score: ten pips filled up to it, then the number. */
+  .score-meter { display: inline-flex; align-items: center; gap: .5rem; white-space: nowrap; }
+  .score-pips { display: inline-flex; gap: 2px; }
+  .score-pips i { width: 4px; height: .7rem; border-radius: 1px; background: var(--line-strong); }
+  .score-pips i.on { background: var(--blood-2); }
+  .score-meter b { min-width: 1.2em; text-align: right; font: 800 1.05rem/1 var(--display); font-variant-numeric: tabular-nums; color: var(--ink); }
   .rating-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .6rem .75rem; margin-top: .85rem; padding-top: .85rem; border-top: 1px solid var(--line); }
-  .star-picker { flex: 1 1 11rem; margin: 0; min-width: 0; }
-  .star-picker legend { padding: 0 0 .25rem; color: var(--muted); font-size: .66rem; font-weight: 600; letter-spacing: .2em; text-transform: uppercase; }
-  .star-options { display: flex; }
-  .star-options input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; min-height: 0; pointer-events: none; }
-  .star-options label { flex: 1 1 0; display: grid; place-items: center; max-width: 2.9rem; min-height: 44px; margin: 0; color: var(--line-strong); font-size: 1.65rem; line-height: 1; cursor: pointer; transition: color .1s, transform .1s; }
-  .star-options label::before { content: "★"; }
-  .star-options label:active { transform: scale(.9); }
-  .star-options input:focus-visible + label { outline: 2px solid var(--blood-2); outline-offset: -4px; border-radius: 4px; }
-  /* Light every star up to the chosen or hovered score. */
-  .star-options input:checked + label,
-  .star-options:has(input:nth-of-type(2):checked) label:nth-of-type(-n+2),
-  .star-options:has(input:nth-of-type(3):checked) label:nth-of-type(-n+3),
-  .star-options:has(input:nth-of-type(4):checked) label:nth-of-type(-n+4),
-  .star-options:has(input:nth-of-type(5):checked) label:nth-of-type(-n+5) { color: var(--blood-2); }
+  .score-picker { flex: 1 1 100%; margin: 0; min-width: 0; }
+  .score-picker legend { padding: 0 0 .4rem; color: var(--muted); font-size: .66rem; font-weight: 600; letter-spacing: .2em; text-transform: uppercase; }
+  /* Two rows of five keep touch targets large; the featured verdict uses one
+     row of ten when it has room. */
+  .score-options { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .3rem; }
+  @container verdict (min-width: 30rem) { .score-options { grid-template-columns: repeat(10, minmax(0, 1fr)); } }
+  .score-options input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; min-height: 0; pointer-events: none; }
+  .score-options label { display: grid; place-items: center; min-height: 44px; margin: 0; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--bg); color: var(--ink-2); font: 700 1.2rem/1 var(--display); font-variant-numeric: tabular-nums; cursor: pointer; user-select: none; -webkit-user-select: none; touch-action: manipulation; transition: background .12s, border-color .12s, color .12s, transform .1s; }
+  .score-options label:active { transform: scale(.93); }
+  .score-options input:focus-visible + label { outline: 2px solid var(--blood-2); outline-offset: 2px; }
+  /* Fill the scale up to the chosen score, like a gauge. */
+  .score-options:has(input:checked) label { background: var(--blood-soft); border-color: var(--blood-ring); color: #ffc4bd; }
+  .score-options input:checked + label { background: var(--blood); border-color: var(--blood); color: #fff; box-shadow: 0 6px 16px -8px rgba(204, 47, 40, .9); }
+  .score-options input:checked + label ~ label { background: var(--bg); border-color: var(--line-strong); color: var(--ink-2); }
   @media (hover: hover) {
-    .star-options:hover label { color: var(--line-strong) !important; }
-    .star-options:hover label:hover,
-    .star-options:has(label:nth-of-type(2):hover) label:nth-of-type(-n+2),
-    .star-options:has(label:nth-of-type(3):hover) label:nth-of-type(-n+3),
-    .star-options:has(label:nth-of-type(4):hover) label:nth-of-type(-n+4),
-    .star-options:has(label:nth-of-type(5):hover) label:nth-of-type(-n+5) { color: var(--ink) !important; }
+    /* Preview a score on hover; the extra class outranks the chosen score. */
+    .score-picker .score-options:has(label:hover) label { background: rgba(239, 229, 208, .07); border-color: var(--muted); color: var(--ink); box-shadow: none; }
+    .score-picker .score-options label:hover ~ label { background: var(--bg); border-color: var(--line-strong); color: var(--ink-2); }
+    .score-picker .score-options input + label:hover { background: var(--ink); border-color: var(--ink); color: var(--on-ink); }
+    .score-picker .score-options input:checked + label:hover { background: var(--blood); border-color: var(--blood); color: #fff; }
   }
+  .score-anchors { display: flex; justify-content: space-between; gap: 1rem; margin: .45rem 0 0; color: var(--muted); font-size: .72rem; letter-spacing: .04em; }
   .rating-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
   .rating-form button { flex: 0 0 auto; min-height: 42px; padding: .5rem 1.1rem; }
   .rating-note { flex-basis: 100%; margin: 0; color: var(--muted); font-size: .78rem; line-height: 1.4; }
   .movie-card .rating-form { flex-direction: column; align-items: stretch; }
-  .movie-card .star-picker { flex: 0 0 auto; }
+  .movie-card .score-picker { flex: 0 0 auto; }
   .movie-card .rating-actions { flex-direction: column; }
   .movie-card .rating-form button { width: 100%; }
   /* Lineup cards keep the household verdict visible and tuck the picker away.
@@ -527,9 +530,10 @@
   .rate-panel[open] > summary::before { transform: rotate(45deg); margin-top: -.2rem; }
   .rate-panel > summary:hover, .rate-panel[open] > summary { color: var(--ink); }
   .rate-panel.is-due > summary { color: var(--blood-2); }
-  .rate-panel .rating-form { position: absolute; left: -.35rem; right: -.35rem; bottom: calc(100% + .35rem); z-index: 2; gap: .5rem; margin: 0; padding: .7rem .75rem .8rem; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--surface-2); box-shadow: 0 -18px 36px -18px rgba(0, 0, 0, .95); }
-  .rate-panel .star-picker legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; padding: 0; }
-  .movie-card .star-options label { font-size: 1.45rem; }
+  .rate-panel .rating-form { position: absolute; left: -.75rem; right: -.75rem; bottom: calc(100% + .35rem); z-index: 2; gap: .5rem; margin: 0; padding: .7rem .6rem .75rem; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--surface-2); box-shadow: 0 -18px 36px -18px rgba(0, 0, 0, .95); }
+  .rate-panel .score-picker legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; padding: 0; }
+  .movie-card .score-options { gap: .25rem; }
+  .movie-card .score-options label { font-size: 1.1rem; }
 
   /* ---------- Empty states ---------- */
   .empty-state { padding: 3.5rem 1.5rem; margin: 1rem 0; text-align: center; border: 1px dashed var(--line-strong); border-radius: var(--radius); }
@@ -668,4 +672,4 @@
   <p>Movie data provided by <a href="https://www.themoviedb.org">TMDB</a>. This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
 </footer>
 {{end}}
-{{define "star_row"}}<span class="stars" aria-hidden="true"><span class="on">{{if ge .Score 1}}★{{end}}{{if ge .Score 2}}★{{end}}{{if ge .Score 3}}★{{end}}{{if ge .Score 4}}★{{end}}{{if ge .Score 5}}★{{end}}</span><span class="off">{{if lt .Score 5}}★{{end}}{{if lt .Score 4}}★{{end}}{{if lt .Score 3}}★{{end}}{{if lt .Score 2}}★{{end}}{{if lt .Score 1}}★{{end}}</span></span>{{end}}
+{{define "score_meter"}}<span class="score-meter" aria-hidden="true"><span class="score-pips">{{range $i := 10}}<i{{if lt $i $.Score}} class="on"{{end}}></i>{{end}}</span><b>{{.Score}}</b></span>{{end}}

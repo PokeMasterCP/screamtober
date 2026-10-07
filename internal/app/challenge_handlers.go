@@ -236,7 +236,13 @@ func (p challengePage) RatingPanel(movie challengeMovieView, featured bool) rati
 	return ratingPanel{Movie: movie, Year: p.Year, SignedIn: p.SignedIn, Featured: featured}
 }
 
-func (ratingPanel) Scores() []int64 { return []int64{1, 2, 3, 4, 5} }
+func (ratingPanel) Scores() []int64 {
+	scores := make([]int64, maxScore)
+	for i := range scores {
+		scores[i] = int64(i + 1)
+	}
+	return scores
+}
 
 type challengeNight struct {
 	Day     int64

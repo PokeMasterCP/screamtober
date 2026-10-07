@@ -78,9 +78,11 @@ least recently used one. Admin sessions stay in memory.
 ## Pages
 
 Use `site_style.html`, the buffered `renderPage` helper, and `movie_ratings.html`
-for shared rating controls and verdicts. The featured movie shows its star picker
+for shared rating controls and verdicts. The featured movie shows its 1–10 score picker
 inline; lineup cards tuck theirs into a `rate-panel` disclosure that opens over the
-card without resizing the row and works without JavaScript. Poster-only carousel
+card without resizing the row and works without JavaScript. The picker is CSS-only
+radio buttons in two rows of five, widening to one row where the featured verdict
+has room; keep touch targets at least 44px tall. Poster-only carousel
 cards must retain accessible movie names. Home page summaries (month calendar, countdown, critics,
 top pick, unrated reminders) derive from the challenge's existing movie and rating
 queries; keep them free of extra queries and live TMDB requests. Calendar nights

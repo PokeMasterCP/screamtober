@@ -2,7 +2,7 @@
 
 Screamtober is a self-hosted October movie challenge for 1–4 people. Pick up to
 31 movies each year, track what your household has watched, and rate movies
-with 1–5 stars. Past years stay saved. Anyone can browse; invited members can rate.
+from 1 to 10. Past years stay saved. Anyone can browse; invited members can rate.
 
 ## Self-host with Docker
 

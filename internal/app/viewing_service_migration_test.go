@@ -39,7 +39,8 @@ func TestViewingServiceUpgradePreservesExistingData(t *testing.T) {
 		"SELECT * FROM users ORDER BY id", "SELECT * FROM user_tokens ORDER BY user_id",
 		"SELECT * FROM movies ORDER BY id", "SELECT * FROM challenges ORDER BY id",
 		"SELECT id, challenge_id, movie_id, position, watched_at, submission_key FROM challenge_movies ORDER BY id",
-		"SELECT * FROM ratings ORDER BY id",
+		// Scores are doubled by a later migration; see TestTenPointRatingUpgrade.
+		"SELECT id, user_id, challenge_movie_id, updated_at FROM ratings ORDER BY id",
 	}
 	snapshot := func() [][][]any {
 		t.Helper()

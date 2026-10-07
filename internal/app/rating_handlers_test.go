@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -26,13 +27,13 @@ func TestRatingCreateEditAndPublicCards(t *testing.T) {
 	h := challengeHTTPFixture(t, db)
 	cookie := loginCookie(t, h)
 	execSchema(t, db, `DELETE FROM ratings WHERE user_id = 2 AND challenge_movie_id = 1`)
-	for _, score := range []string{"1", "5", "3"} {
+	for _, score := range []string{"1", "10", "3"} {
 		w := ratingRequest(h, "/challenges/2026/movies/1/rating", "score="+score+"&user_id=1", cookie)
 		if w.Code != 303 || w.Header().Get("Location") != "/challenges/2026#movie-1" {
 			t.Fatalf("save = %d %s", w.Code, w.Body.String())
 		}
 		var count, actual int
-		if err := db.QueryRow(`SELECT count(*), max(score) FROM ratings WHERE user_id = 2 AND challenge_movie_id = 1`).Scan(&count, &actual); err != nil || count != 1 || actual != int(score[0]-'0') {
+		if err := db.QueryRow(`SELECT count(*), max(score) FROM ratings WHERE user_id = 2 AND challenge_movie_id = 1`).Scan(&count, &actual); err != nil || count != 1 || strconv.Itoa(actual) != score {
 			t.Fatalf("rating = %d, %d, %v", count, actual, err)
 		}
 	}
@@ -44,7 +45,7 @@ func TestRatingCreateEditAndPublicCards(t *testing.T) {
 	for _, c := range []*http.Cookie{nil, cookie} {
 		w := authRequest(h, "GET", "/challenges/2026", "", c)
 		body := w.Body.String()
-		for _, want := range []string{"Household rating: 2.0 / 5 (2 ratings)", "Member: 3 / 5", "Owner: 1 / 5"} {
+		for _, want := range []string{"Household rating: 2.0 / 10 (2 ratings)", "Member: 3 / 10", "Owner: 1 / 10"} {
 			if w.Code != 200 || !strings.Contains(body, want) {
 				t.Fatalf("missing %q", want)
 			}
@@ -69,7 +70,7 @@ func TestRatingRejectsInvalidInput(t *testing.T) {
 	db := schemaFixture(t)
 	h := challengeHTTPFixture(t, db)
 	cookie := loginCookie(t, h)
-	for _, body := range []string{"", "score=0", "score=6", "score=-1", "score=3.5", "score=abc", "score=9999999999999999999999", "score=1&score=5", "score=%ZZ", "score=" + strings.Repeat("1", 4097)} {
+	for _, body := range []string{"", "score=0", "score=11", "score=100", "score=-1", "score=3.5", "score=05", "score=+5", "score=%205", "score=1e1", "score=abc", "score=9999999999999999999999", "score=1&score=5", "score=%ZZ", "score=" + strings.Repeat("1", 4097)} {
 		if w := ratingRequest(h, "/challenges/2026/movies/1/rating", body, cookie); w.Code != 400 {
 			t.Errorf("body %.30q = %d", body, w.Code)
 		}
