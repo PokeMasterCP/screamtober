@@ -19,7 +19,7 @@
  <fieldset class="score-picker">
   <legend>Your rating<span class="visually-hidden">, from 1 (awful) to 10 (masterpiece)</span></legend>
   <div class="score-options">
-   {{range .Scores}}<input type="radio" id="rating-{{$.Movie.ID}}-{{.}}" name="score" value="{{.}}"{{if eq $.Movie.YourRating .}} checked{{end}} required><label for="rating-{{$.Movie.ID}}-{{.}}"><span class="visually-hidden">{{.}} out of 10</span></label>{{end}}
+   {{range .Scores}}<input type="radio" id="rating-{{$.Movie.ID}}-{{.}}" name="score" value="{{.}}"{{if eq $.Movie.YourRating .}} checked{{end}} required><label for="rating-{{$.Movie.ID}}-{{.}}"><span class="score-number">{{.}}</span><span class="visually-hidden"> out of 10</span></label>{{end}}
   </div>
   <p class="score-anchors" aria-hidden="true"><span>1 · Awful</span><span>10 · Masterpiece</span></p>
  </fieldset>

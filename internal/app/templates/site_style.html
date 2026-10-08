@@ -485,6 +485,10 @@
   .rating-scale { color: var(--muted); font-size: .8rem; }
   .ratings { list-style: none; padding: 0; margin: .15rem 0 0; font-size: .84rem; }
   .ratings li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .1rem .75rem; padding: .28rem 0; }
+  /* Lineup cards are too narrow for a name beside its ghosts; stack every row
+     the same way so short and long names line up. */
+  .movie-card .ratings li { flex-direction: column; align-items: stretch; gap: .2rem; }
+  .movie-card .score-meter { justify-content: space-between; }
   .ratings li + li { border-top: 1px dashed var(--line); }
   .rater { color: var(--ink-2); font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* Ratings are shown as ghosts: each one a mask filled with its text color. */
@@ -503,8 +507,11 @@
   .score-options { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .3rem; }
   @container verdict (min-width: 30rem) { .score-options { grid-template-columns: repeat(10, minmax(0, 1fr)); } }
   .score-options input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; min-height: 0; pointer-events: none; }
-  .score-options label { display: grid; place-items: center; min-height: 44px; margin: 0; border-radius: var(--radius-sm); color: var(--faint); cursor: pointer; user-select: none; -webkit-user-select: none; touch-action: manipulation; transition: color .12s, transform .1s; }
+  /* Each ghost carries its number so the 1–10 order reads across both rows. */
+  .score-options label { display: grid; justify-items: center; align-content: center; gap: .15rem; min-height: 44px; margin: 0; border-radius: var(--radius-sm); color: var(--faint); font: 600 .78rem/1 var(--body); font-variant-numeric: tabular-nums; cursor: pointer; user-select: none; -webkit-user-select: none; touch-action: manipulation; transition: color .12s, transform .1s; }
   .score-options label::before { content: ""; width: 2rem; height: 2.2rem; }
+  .score-number { color: var(--ink-2); }
+  .score-options input:checked + label .score-number { color: var(--blood-2); font-weight: 800; }
   .score-options label:active { transform: scale(.9); }
   .score-options input:focus-visible + label { outline: 2px solid var(--blood-2); outline-offset: 2px; }
   /* Light every ghost up to the chosen score; the chosen one glows. */
@@ -542,6 +549,7 @@
     .score-pips i, .score-options label { forced-color-adjust: none; color: GrayText; }
     .score-pips i.on, .score-picker .score-options:has(input:checked) label { color: Highlight; }
     .score-picker .score-options input:checked + label ~ label { color: GrayText; }
+    .score-number { color: CanvasText; }
   }
 
   /* ---------- Empty states ---------- */
