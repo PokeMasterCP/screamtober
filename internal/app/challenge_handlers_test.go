@@ -145,13 +145,13 @@ func TestChallengePosterURLs(t *testing.T) {
 				}
 				if tt.want != "" {
 					// Each repeated challenge entry has its own poster and calendar
-					// thumbnail; the top-rated entry adds one more thumbnail.
+					// thumbnail; the top- and worst-rated entries each add one more.
 					if count := strings.Count(body, `src="`+tt.want+`"`); count != 2 {
 						t.Errorf("poster count = %d, want 2", count)
 					}
 					thumb := strings.Replace(tt.want, "/w500/", "/w185/", 1)
-					if count := strings.Count(body, `src="`+thumb+`"`); count != 3 {
-						t.Errorf("thumbnail count = %d, want 3", count)
+					if count := strings.Count(body, `src="`+thumb+`"`); count != 4 {
+						t.Errorf("thumbnail count = %d, want 4", count)
 					}
 				} else if strings.Contains(body, `src="https://image.tmdb.org/`) {
 					t.Error("missing or invalid path produced a poster URL")
@@ -353,6 +353,28 @@ func TestChallengeHouseholdSummary(t *testing.T) {
 		if got := strings.Contains(body, `Your turn.`) && strings.Contains(body, `<li><a href="#movie-2">`); got != (cookie != nil) {
 			t.Fatalf("unrated reminder shown = %v for signed in = %v", got, cookie != nil)
 		}
+		if strings.Contains(body, `class="top-pick worst-pick"`) {
+			t.Fatal("a lone rated entry must not also appear as the worst rated")
+		}
+	}
+}
+
+func TestChallengeWorstRated(t *testing.T) {
+	db := schemaFixture(t)
+	// Entry 1 averages 3.0 from two ratings and entry 2 averages 2.0 from one.
+	h := challengeHTTPFixture(t, db)
+	for _, cookie := range []*http.Cookie{nil, loginCookie(t, h)} {
+		body := authRequest(h, "GET", "/challenges/2026", "", cookie).Body.String()
+		for _, want := range []string{`class="top-pick" href="#movie-1"`, `class="top-pick worst-pick" href="#movie-2"`, `<small>Worst rated</small><b>Test movie</b><span>2.0 / 10 · 1 rating</span>`} {
+			if !strings.Contains(body, want) {
+				t.Fatalf("summary missing %q", want)
+			}
+		}
+	}
+	// Equal averages leave no distinct worst entry to show.
+	execSchema(t, db, `UPDATE ratings SET score = 3 WHERE user_id = 2 AND challenge_movie_id = 2`)
+	if body := authRequest(h, "GET", "/challenges/2026", "", nil).Body.String(); strings.Contains(body, `class="top-pick worst-pick"`) {
+		t.Fatal("tied averages must not repeat the top pick as the worst rated")
 	}
 }
 

@@ -43,6 +43,8 @@ type challengePage struct {
 	Average     string
 	Critics     []critic
 	TopMovie    *challengeMovieView
+	// WorstMovie is the lowest-rated entry, unset when it would repeat TopMovie.
+	WorstMovie *challengeMovieView
 	// ToRate lists watched entries the signed-in person has not rated yet.
 	ToRate []challengeMovieView
 }
@@ -200,6 +202,12 @@ func (h *challengeHandler) render(w http.ResponseWriter, r *http.Request, challe
 			if top := data.TopMovie; top == nil || m.score > top.score || (m.score == top.score && len(m.Ratings) > len(top.Ratings)) {
 				data.TopMovie = m
 			}
+			if worst := data.WorstMovie; worst == nil || m.score < worst.score || (m.score == worst.score && len(m.Ratings) > len(worst.Ratings)) {
+				data.WorstMovie = m
+			}
+		}
+		if data.WorstMovie == data.TopMovie {
+			data.WorstMovie = nil
 		}
 		if now.Month() == time.October && int64(now.Year()) == selected.Year {
 			data.Today = int64(now.Day())
