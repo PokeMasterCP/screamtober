@@ -85,7 +85,7 @@ radio buttons drawn as ghosts (`--ghost-mask`), each labeled with its number, in
 widening to one row where the featured verdict has room; keep touch targets at least 44px tall.
 Lineup cards stack each rater's name above their ghosts so every row lines up. Poster-only carousel
 cards must retain accessible movie names. Home page summaries (month calendar, countdown, critics,
-top pick, unrated reminders) derive from the challenge's existing movie and rating
+top and worst picks, unrated reminders) derive from the challenge's existing movie and rating
 queries; keep them free of extra queries and live TMDB requests. Calendar nights
 use `moviePosterThumbURL` for smaller TMDB images. Keep server-side validation, conflict detection, and
 rollback coverage for calendar arrangement.

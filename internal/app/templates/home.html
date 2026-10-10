@@ -100,7 +100,10 @@
       <aside class="critics" aria-labelledby="critics-heading">
         <h3 id="critics-heading" class="label">Critics’ corner</h3>
         {{if .ToRate}}<div class="to-rate"><p><b>Your turn.</b> You’ve watched {{len .ToRate}} {{if eq (len .ToRate) 1}}movie{{else}}movies{{end}} without rating {{if eq (len .ToRate) 1}}it{{else}}them{{end}}.</p><ul>{{range .ToRate}}<li><a href="#movie-{{.ID}}">{{.Title}}</a></li>{{end}}</ul></div>{{end}}
-        {{with .TopMovie}}<a class="top-pick" href="#movie-{{.ID}}"><span class="top-pick-poster" aria-hidden="true">{{if .ThumbURL}}<img src="{{.ThumbURL}}" alt="" width="92" height="138" loading="lazy" decoding="async" referrerpolicy="no-referrer">{{end}}</span><span><small>Top rated</small><b>{{.Title}}</b><span>{{.Average}} / 10 · {{len .Ratings}} {{if eq (len .Ratings) 1}}rating{{else}}ratings{{end}}</span></span></a>{{end}}
+        {{if .TopMovie}}<div class="critic-picks">
+          {{with .TopMovie}}<a class="top-pick" href="#movie-{{.ID}}"><span class="top-pick-poster" aria-hidden="true">{{if .ThumbURL}}<img src="{{.ThumbURL}}" alt="" width="92" height="138" loading="lazy" decoding="async" referrerpolicy="no-referrer">{{end}}</span><span><small>Top rated</small><b>{{.Title}}</b><span>{{.Average}} / 10 · {{len .Ratings}} {{if eq (len .Ratings) 1}}rating{{else}}ratings{{end}}</span></span></a>{{end}}
+          {{with .WorstMovie}}<a class="top-pick worst-pick" href="#movie-{{.ID}}"><span class="top-pick-poster" aria-hidden="true">{{if .ThumbURL}}<img src="{{.ThumbURL}}" alt="" width="92" height="138" loading="lazy" decoding="async" referrerpolicy="no-referrer">{{end}}</span><span><small>Worst rated</small><b>{{.Title}}</b><span>{{.Average}} / 10 · {{len .Ratings}} {{if eq (len .Ratings) 1}}rating{{else}}ratings{{end}}</span></span></a>{{end}}
+        </div>{{end}}
         {{if .Critics}}
         <ol class="critic-list" aria-label="Ratings by person">
           {{range .Critics}}<li><span class="critic-initial" aria-hidden="true">{{$.Initial .Name}}</span><span class="critic-name">{{.Name}}</span><span class="critic-stats">{{.Count}} rated · <b>{{.Average}}</b> avg</span></li>{{end}}
