@@ -267,3 +267,45 @@ func TestMovieSearchCompletionLog(t *testing.T) {
 		}
 	})
 }
+
+func TestExistingMoviesTabSkipsSearch(t *testing.T) {
+	db, _, err := openDatabase(context.Background(), filepath.Join(t.TempDir(), "search.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	a, _ := portalFixture(t, db)
+	if _, err := addYearlyMovie(context.Background(), db, tmdb.MovieSummary{ID: 77, Title: "Already picked"}, 2026, "seed", ""); err != nil {
+		t.Fatal(err)
+	}
+	stub := &searchStub{result: tmdb.SearchResults{Page: 1, TotalPages: 1, Results: []tmdb.MovieSummary{{ID: 948, Title: "Halloween"}}}}
+	h, err := newHandlerWithMovieSearch(a, db, stub, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cookie := adminCookie(t, h)
+	found := portalRequest(h, "GET", "/admin/movies/search?q=Halloween&year=2026", nil, cookie)
+	body := found.Body.String()
+	if found.Code != 200 || !strings.Contains(body, "Halloween") || strings.Contains(body, "Already picked") || strings.Contains(body, `class="current-pick"`) || stub.calls != 1 {
+		t.Fatalf("search results included the lineup: calls %d body %s", stub.calls, body)
+	}
+	if !strings.Contains(body, "tab=existing") || !strings.Contains(body, "q=Halloween") || !strings.Contains(body, `aria-current="page">Add a movie`) {
+		t.Fatal("existing-movies tab did not keep the search", body)
+	}
+	lineup := portalRequest(h, "GET", "/admin/movies/search?q=Halloween&tab=existing&year=2026", nil, cookie)
+	lineupBody := lineup.Body.String()
+	if lineup.Code != 200 || !strings.Contains(lineupBody, "Already picked") || strings.Contains(lineupBody, "Search results") || stub.calls != 1 {
+		t.Fatalf("existing tab searched or hid the lineup: calls %d body %s", stub.calls, lineupBody)
+	}
+	if !strings.Contains(lineupBody, "q=Halloween") || !strings.Contains(lineupBody, `aria-current="page">Existing movies`) || strings.Contains(lineupBody, `role="search"`) {
+		t.Fatal("return to search was not preserved", lineupBody)
+	}
+	empty := portalRequest(h, "GET", "/admin/movies/search?year=2031&tab=existing", nil, cookie)
+	if empty.Code != 200 || !strings.Contains(empty.Body.String(), "Nothing in 2031 yet.") || strings.Contains(empty.Body.String(), `class="current-pick-list"`) {
+		t.Fatal("empty lineup", empty.Code, empty.Body.String())
+	}
+	bad := portalRequest(h, "GET", "/admin/movies/search?year=0&tab=existing", nil, cookie)
+	if bad.Code != 400 || !strings.Contains(bad.Body.String(), "Choose a year between 1 and 9999.") {
+		t.Fatal("invalid lineup year", bad.Code, bad.Body.String())
+	}
+}

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   {{template "page_head"}}
-  <title>Search movies · Screamtober</title>
+  <title>{{if .Lineup}}Existing movies{{else}}Search movies{{end}} · Screamtober</title>
   {{template "site_style"}}
 </head>
 <body>
@@ -10,10 +10,28 @@
 <main class="admin-page admin-movie-search-page">
   <header class="page-header" id="content">
     <p class="eyebrow">Administration</p>
-    <h1>Search movies</h1>
-    <p class="lede">Choose a challenge year, then find a movie to add to its lineup. Results come straight from TMDB.</p>
+    <h1>{{if .Lineup}}Existing movies{{else}}Search movies{{end}}</h1>
+    <p class="lede">{{if .Lineup}}Edit or remove movies already chosen for this challenge year.{{else}}Choose a challenge year, then find a movie to add to its lineup. Results come straight from TMDB.{{end}}</p>
     {{template "admin_nav" "movies"}}
   </header>
+  <nav class="movie-tabs" aria-label="Add or edit movies">
+    <a href="{{.SearchTab}}"{{if not .Lineup}} aria-current="page"{{end}}>Add a movie</a>
+    <a href="{{.LineupTab}}"{{if .Lineup}} aria-current="page"{{end}}>Existing movies{{if and (ge .Year 1) (le .Year 9999)}} <span class="tab-count">{{len .Current}}</span>{{end}}</a>
+  </nav>
+  {{if .Lineup}}
+  <form class="panel search-form" method="get" action="/admin/movies/search">
+    <input type="hidden" name="tab" value="existing">
+    {{if .ReturnQuery}}<input type="hidden" name="q" value="{{.ReturnQuery}}">{{end}}
+    {{if gt .ReturnPage 1}}<input type="hidden" name="page" value="{{.ReturnPage}}">{{end}}
+    <div class="field-row">
+      <div class="year-field">
+        <label for="lineup-year">Challenge year</label>
+        <input type="number" id="lineup-year" name="year" min="1" max="9999" value="{{.Year}}" required{{if .Error}} aria-describedby="search-error"{{end}}>
+      </div>
+      <button class="secondary" type="submit">Load year</button>
+    </div>
+  </form>
+  {{else}}
   <form class="panel search-form" method="get" action="/admin/movies/search" role="search">
     <div class="field-row">
       <div class="year-field">
@@ -27,9 +45,11 @@
       <button type="submit">Search</button>
     </div>
   </form>
+  {{end}}
   <p class="toolbar-links"><a href="/admin/calendar?year={{.Year}}">Arrange the {{.Year}} lineup →</a></p>
   {{if .Error}}<p class="error" id="search-error" role="alert">{{.Error}}</p>{{end}}
   {{if .Notice}}<p class="notice" role="status">{{.Notice}}</p>{{end}}
+  {{if .Lineup}}
   {{if .Current}}
   <section class="current-picks" aria-labelledby="current-picks-heading">
     <div class="current-picks-heading"><div><p class="eyebrow">Already selected</p><h2 id="current-picks-heading">{{.Year}} lineup</h2></div><span class="count"><b>{{len .Current}}</b> / 31 picks</span></div>
@@ -50,8 +70,10 @@
       {{end}}
     </ol>
   </section>
+  {{else if and (ge .Year 1) (le .Year 9999) (not .Error)}}
+  <div class="empty-state"><p class="eyebrow">No picks yet</p><h2>Nothing in {{.Year}} yet.</h2><p>Search for a movie and add it to this year’s lineup.</p><a class="button" href="{{.SearchTab}}">Search for a movie</a></div>
   {{end}}
-  {{if .Searched}}
+  {{else if .Searched}}
   <section class="search-results" aria-labelledby="results-heading">
     <div class="results-heading"><h2 id="results-heading">Search results</h2><span>Page {{.Page}}{{if .Query}} · “{{.Query}}”{{end}}</span></div>
     {{if .Empty}}<p class="empty-results">No movies found. Try a different title.</p>{{else}}
