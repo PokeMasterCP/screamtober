@@ -40,6 +40,7 @@ func (h *movieSearchHandler) add(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data.Query = entry.query
+	data.ReturnQuery = entry.query
 	id, err := strconv.ParseInt(r.PostForm.Get("movie_id"), 10, 64)
 	if err != nil {
 		reject(400, "Select a movie from the search results. Please search again.", "invalid_selection")
@@ -101,7 +102,7 @@ func (h *movieSearchHandler) updateService(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	eventSucceeded(r, "viewing_service", values[0])
-	http.Redirect(w, r, fmt.Sprintf("/admin/movies/search?year=%d&updated=1", year), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/admin/movies/search?year=%d&tab=existing&updated=1", year), http.StatusSeeOther)
 }
 
 func (h *movieSearchHandler) delete(w http.ResponseWriter, r *http.Request) {
@@ -121,7 +122,7 @@ func (h *movieSearchHandler) delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	eventSucceeded(r)
-	http.Redirect(w, r, fmt.Sprintf("/admin/movies/search?year=%d&deleted=1", year), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/admin/movies/search?year=%d&tab=existing&deleted=1", year), http.StatusSeeOther)
 }
 
 func nullableMovieText(value *string) sql.NullString {

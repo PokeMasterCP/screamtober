@@ -116,9 +116,14 @@ func TestUpdateViewingServiceAndDeleteMovie(t *testing.T) {
 	_, h := portalFixture(t, db)
 	admin := adminCookie(t, h)
 
-	page := portalRequest(h, "GET", "/admin/movies/search?year=2026", nil, admin)
+	searchOnly := portalRequest(h, "GET", "/admin/movies/search?year=2026", nil, admin)
+	searchBody := searchOnly.Body.String()
+	if searchOnly.Code != http.StatusOK || strings.Contains(searchBody, "Where we’re watching") || strings.Contains(searchBody, `class="current-pick-list"`) || !strings.Contains(searchBody, "Existing movies") || !strings.Contains(searchBody, "tab=existing") {
+		t.Fatalf("add view still lists existing movies: %d %s", searchOnly.Code, searchBody)
+	}
+	page := portalRequest(h, "GET", "/admin/movies/search?year=2026&tab=existing", nil, admin)
 	body := page.Body.String()
-	if page.Code != http.StatusOK || !strings.Contains(body, "2026 lineup") || !strings.Contains(body, "Test movie") || !strings.Contains(body, "Where we’re watching") || !strings.Contains(body, `action="/admin/challenges/2026/movies/1/service"`) {
+	if page.Code != http.StatusOK || !strings.Contains(body, "2026 lineup") || !strings.Contains(body, "Test movie") || !strings.Contains(body, "Where we’re watching") || !strings.Contains(body, `action="/admin/challenges/2026/movies/1/service"`) || strings.Contains(body, `name="q"`) {
 		t.Fatalf("current picks missing: %d %s", page.Code, body)
 	}
 	if strings.Contains(body, "Change movie") || strings.Contains(body, "Choosing replacement") || strings.Contains(body, "entry_id") {
@@ -139,7 +144,7 @@ func TestUpdateViewingServiceAndDeleteMovie(t *testing.T) {
 	if w := portalRequest(h, "POST", "/admin/challenges/2026/movies/1/service", url.Values{"viewing_service": {"unsupported"}}, admin); w.Code != http.StatusBadRequest {
 		t.Fatal("unsupported viewing service accepted")
 	}
-	if w := portalRequest(h, "POST", "/admin/challenges/2026/movies/1/service", url.Values{"viewing_service": {"netflix"}}, admin); w.Code != http.StatusSeeOther || w.Header().Get("Location") != "/admin/movies/search?year=2026&updated=1" {
+	if w := portalRequest(h, "POST", "/admin/challenges/2026/movies/1/service", url.Values{"viewing_service": {"netflix"}}, admin); w.Code != http.StatusSeeOther || w.Header().Get("Location") != "/admin/movies/search?year=2026&tab=existing&updated=1" {
 		t.Fatalf("service update response = %d %q", w.Code, w.Header().Get("Location"))
 	}
 	q := store.New(db)
@@ -166,8 +171,12 @@ func TestUpdateViewingServiceAndDeleteMovie(t *testing.T) {
 		t.Fatalf("catalog movie removed: %v", err)
 	}
 
-	if w := portalRequest(h, "POST", "/admin/challenges/2026/movies/2/delete", nil, admin); w.Code != http.StatusSeeOther || w.Header().Get("Location") != "/admin/movies/search?year=2026&deleted=1" {
+	if w := portalRequest(h, "POST", "/admin/challenges/2026/movies/2/delete", nil, admin); w.Code != http.StatusSeeOther || w.Header().Get("Location") != "/admin/movies/search?year=2026&tab=existing&deleted=1" {
 		t.Fatalf("delete response = %d %q", w.Code, w.Header().Get("Location"))
+	}
+	deleted := portalRequest(h, "GET", "/admin/movies/search?year=2026&tab=existing&deleted=1", nil, admin)
+	if deleted.Code != http.StatusOK || !strings.Contains(deleted.Body.String(), "The movie was deleted from 2026") || !strings.Contains(deleted.Body.String(), `aria-current="page">Existing movies`) || strings.Contains(deleted.Body.String(), `movies/2/delete`) {
+		t.Fatalf("delete confirmation left the existing movies tab: %d %s", deleted.Code, deleted.Body.String())
 	}
 	if err := db.QueryRow(`SELECT count(*) FROM challenge_movies WHERE id=2`).Scan(&count); err != nil || count != 0 {
 		t.Fatalf("deleted entry still exists: %d, %v", count, err)

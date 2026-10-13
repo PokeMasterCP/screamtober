@@ -240,10 +240,19 @@
   .admin-calendar-page .save-bar { max-width: 72rem; margin-left: auto; margin-right: auto; }
   .admin-movie-search-page .search-form,
   .admin-movie-search-page .toolbar-links,
-  .admin-movie-search-page .search-results { max-width: 68rem; margin-left: auto; margin-right: auto; }
+  .admin-movie-search-page .search-results,
+  .admin-movie-search-page .movie-tabs,
+  .admin-movie-search-page .empty-state { max-width: 68rem; margin-left: auto; margin-right: auto; }
   .admin-movie-search-page .toolbar-links { justify-content: center; }
 
   /* ---------- Movie search ---------- */
+  .movie-tabs { display: flex; flex-wrap: wrap; gap: .25rem; width: fit-content; max-width: 100%; margin: 0 auto 1.5rem; padding: .3rem; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-elev); }
+  .movie-tabs a { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; min-height: 40px; padding: .45rem 1rem; border-radius: var(--radius-sm); text-decoration: none; color: var(--muted); font-weight: 600; font-size: .9rem; transition: color .15s, background .15s; }
+  .movie-tabs a:hover { color: var(--ink); background: var(--surface-2); }
+  .movie-tabs a[aria-current="page"] { color: var(--on-ink); background: var(--ink); }
+  .movie-tabs a:focus-visible { outline: 2px solid var(--blood-2); outline-offset: 2px; }
+  .movie-tabs .tab-count { display: inline-grid; place-items: center; min-width: 1.35rem; height: 1.35rem; padding: 0 .35rem; border-radius: 999px; background: var(--surface-2); color: var(--ink); font: 700 .78rem/1 var(--display); }
+  .movie-tabs a[aria-current="page"] .tab-count { background: var(--bg); color: var(--ink); }
   .current-picks { max-width: 68rem; margin: 0 auto 2.5rem; padding: 1.5rem; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow); }
   .current-picks-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: .65rem; }
   .current-picks-heading .eyebrow { margin-bottom: .35rem; }
@@ -620,6 +629,8 @@
     .actions button, .actions .button { width: 100%; }
     .auth-panel .actions > a { flex: 0 0 auto; }
     .admin-nav { width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .movie-tabs { width: 100%; display: grid; grid-template-columns: 1fr 1fr; }
+    .movie-tabs a { padding: .45rem .5rem; }
     .admin-nav a { justify-content: center; text-align: center; padding: .45rem .5rem; font-size: .84rem; line-height: 1.2; }
     .admin-nav form { grid-column: 1 / -1; margin: 0; }
     .admin-nav form button { width: 100%; }

@@ -34,18 +34,45 @@ const movieSearchMaxPage = 1000
 func (movieSearchPage) Services() []viewingService { return selectableViewingServices() }
 
 type movieSearchPage struct {
-	Year      int
-	Query     string
-	Error     string
-	Results   []movieChoice
-	Reference string
-	Previous  string
-	Next      string
-	Page      int
-	Notice    string
-	Searched  bool
-	Empty     bool
-	Current   []adminMovie
+	Year        int
+	Query       string
+	Error       string
+	Results     []movieChoice
+	Reference   string
+	Previous    string
+	Next        string
+	Page        int
+	Notice      string
+	Searched    bool
+	Empty       bool
+	Current     []adminMovie
+	Lineup      bool
+	ReturnQuery string
+	ReturnPage  int
+}
+
+func (p movieSearchPage) SearchTab() string { return p.movieTab(false) }
+
+func (p movieSearchPage) LineupTab() string { return p.movieTab(true) }
+
+func (p movieSearchPage) movieTab(lineup bool) string {
+	v := url.Values{}
+	if p.Year >= 1 && p.Year <= 9999 {
+		v.Set("year", strconv.Itoa(p.Year))
+	}
+	if lineup {
+		v.Set("tab", "existing")
+	}
+	if p.ReturnQuery != "" {
+		v.Set("q", p.ReturnQuery)
+		if p.ReturnPage > 1 {
+			v.Set("page", strconv.Itoa(p.ReturnPage))
+		}
+	}
+	if len(v) == 0 {
+		return "/admin/movies/search"
+	}
+	return "/admin/movies/search?" + v.Encode()
 }
 
 type adminMovie struct {
@@ -60,7 +87,10 @@ type adminMovie struct {
 func (m adminMovie) Service() viewingService { return findViewingService(m.ViewingService) }
 
 func (h *movieSearchHandler) search(w http.ResponseWriter, r *http.Request) {
-	data := movieSearchPage{Query: strings.TrimSpace(r.URL.Query().Get("q"))}
+	data := movieSearchPage{Query: strings.TrimSpace(r.URL.Query().Get("q")), Lineup: r.URL.Query().Get("tab") == "existing"}
+	if data.Query != "" && utf8.ValidString(data.Query) && utf8.RuneCountInString(data.Query) <= 200 {
+		data.ReturnQuery = data.Query
+	}
 	data.Year = h.admin.now().Year()
 	if raw := r.URL.Query().Get("year"); raw != "" {
 		year, ok := parseYear(raw)
@@ -75,16 +105,26 @@ func (h *movieSearchHandler) search(w http.ResponseWriter, r *http.Request) {
 		addEventAttrs(r, "year", data.Year)
 		switch {
 		case r.URL.Query().Get("deleted") == "1":
+			data.Lineup = true
 			data.Notice = fmt.Sprintf("The movie was deleted from %d. Its ratings were removed; the catalog record remains available.", data.Year)
 		case r.URL.Query().Get("updated") == "1":
+			data.Lineup = true
 			data.Notice = fmt.Sprintf("The viewing service was updated for the %d lineup.", data.Year)
 		}
+	} else if data.Lineup {
+		data.Error = "Choose a year between 1 and 9999."
+		status = http.StatusBadRequest
 	}
 	page := 1
 	if raw := r.URL.Query().Get("page"); raw != "" {
 		page, _ = strconv.Atoi(raw)
 	}
-	if r.URL.Query().Has("q") {
+	if data.ReturnQuery != "" && page > 1 && page <= movieSearchMaxPage {
+		data.ReturnPage = page
+	}
+	// The existing-movies tab keeps a prior search in the URL so returning to
+	// Add a movie restores it, without listing those picks above the results.
+	if !data.Lineup && r.URL.Query().Has("q") {
 		startEvent(r, "movie.search")
 		if data.Year < 1 || data.Year > 9999 || page < 1 || page > movieSearchMaxPage || data.Query == "" || !utf8.ValidString(data.Query) || utf8.RuneCountInString(data.Query) > 200 {
 			data.Error = fmt.Sprintf("Enter a movie title between 1 and 200 characters, a year between 1 and 9999, and a page between 1 and %d.", movieSearchMaxPage)
