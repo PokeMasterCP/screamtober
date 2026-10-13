@@ -127,3 +127,12 @@ do not change their configuration. Verify normal-mode IP handling locally instea
   details. Keep internal APIs, query mechanics, and test details out of the README.
 - `AGENTS.md`: durable project rules and contributor workflow. Prefer concise,
   task-oriented guidance; avoid feature changelogs and repeated explanations.
+
+## Cursor Cloud specific instructions
+
+The dev server starts on boot at `http://127.0.0.1:8080` with
+`AUTH_INSECURE_COOKIE=true` and SQLite in `data/`. A local admin token is
+written once to `~/.screamtober-dev-admin-token`. `TMDB_API_KEY` is optional:
+live movie search needs it; tests and saved challenges do not. Checks are
+`go test ./...` and `go vet ./...`. `sqlc` 1.31.1 and `goose` 3.28.0 are on
+`PATH`. See [DEVELOPMENT.md](DEVELOPMENT.md).
